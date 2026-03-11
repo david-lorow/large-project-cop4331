@@ -17,40 +17,36 @@ jobs:
       - name: Send Discord Notification
         env:
           DISCORD_HOOK: ${{ secrets.DISCORD_HOOK }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMITTER_NAME: ${{ github.event.head_commit.author.name }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+          TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
-          COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
-          COMMITTER_NAME="${{ github.event.head_commit.author.name }}"
-          BRANCH="${{ github.ref_name }}"
-          REPO="${{ github.repository }}"
-          COMMIT_URL="${{ github.event.head_commit.url }}"
+          PAYLOAD=$(cat <<EOF
+          {
+            "embeds": [{
+              "title": "New Push to $REPO",
+              "url": "$COMMIT_URL",
+              "color": 5763719,
+              "fields": [
+                { "name": "👤 Contributor", "value": "$COMMITTER_NAME", "inline": true },
+                { "name": "🌿 Branch", "value": "$BRANCH", "inline": true },
+                { "name": "💬 Commit Message", "value": "$COMMIT_MESSAGE", "inline": false }
+              ],
+              "footer": { "text": "GitHub Actions" },
+              "timestamp": "$TIMESTAMP"
+            }]
+          }
+          EOF
+          )
 
-          curl -s -X POST "$DISCORD_HOOK" \
+          echo "Sending payload..."
+          RESPONSE=$(curl -s -o /tmp/discord_response.txt -w "%{http_code}" -X POST "$DISCORD_HOOK" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"embeds\": [{
-                \"title\": \"New Push to \$REPO\",
-                \"url\": \"\$COMMIT_URL\",
-                \"color\": 5763719,
-                \"fields\": [
-                  {
-                    \"name\": \"👤 Contributor\",
-                    \"value\": \"\$COMMITTER_NAME\",
-                    \"inline\": true
-                  },
-                  {
-                    \"name\": \"🌿 Branch\",
-                    \"value\": \"\$BRANCH\",
-                    \"inline\": true
-                  },
-                  {
-                    \"name\": \"💬 Commit Message\",
-                    \"value\": \"\$COMMIT_MESSAGE\",
-                    \"inline\": false
-                  }
-                ],
-                \"footer\": {
-                  \"text\": \"GitHub Actions\"
-                },
-                \"timestamp\": \"${{ github.event.head_commit.timestamp }}\"
-              }]
-            }"
+            -d "$PAYLOAD")
+
+          echo "HTTP Status: $RESPONSE"
+          echo "Response body:"
+          cat /tmp/discord_response.txt
