@@ -1,3 +1,4 @@
 # Resume Reaper
 
-Resume evolution, success tracking, application recording. 
+Includes resume evolution, success tracking, application recording. 
+
