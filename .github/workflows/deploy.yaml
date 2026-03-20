@@ -65,11 +65,11 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /path/to/your/repo
+            cd /root/large-project-cop4331
             git pull origin main
             npm install
             cd client
             npm install
             npm run build
             cd ..
-            pm2 restart myapp
+            pm2 restart large-project-cop4331 || pm2 start server.js --name large-project-cop4331
