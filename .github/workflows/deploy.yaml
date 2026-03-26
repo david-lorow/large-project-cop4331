@@ -16,7 +16,6 @@ jobs:
     steps:
       - name: Deploy via SSH
         id: ssh_deploy
-        continue-on-error: true
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -35,19 +34,18 @@ jobs:
             npm run build
 
             cd ..
-            pm2 describe large-project-cop4331 > /dev/null \
-              && pm2 restart large-project-cop4331 \
-              || pm2 start server/server.js --name large-project-cop4331
-
+            pm2 delete large-project-cop4331 || true
+            pm2 start server/server.js --name large-project-cop4331
             pm2 save
 
       - name: Set deploy status
         id: set_status
+        if: always()
         run: |
-          if [ "${{ steps.ssh_deploy.outcome }}" == "success" ]; then
-            echo "status=success" >> $GITHUB_OUTPUT
+          if [ "${{ steps.ssh_deploy.outcome }}" = "success" ]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
           else
-            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "status=failure" >> "$GITHUB_OUTPUT"
           fi
 
   notify:
@@ -57,9 +55,6 @@ jobs:
     if: always()
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Send Discord Notification
         env:
           DISCORD_HOOK: ${{ secrets.DISCORD_HOOK }}
@@ -71,8 +66,8 @@ jobs:
           TIMESTAMP: ${{ github.event.head_commit.timestamp }}
           DEPLOY_STATUS: ${{ needs.deploy.outputs.status }}
         run: |
-          if [ "$BRANCH" == "main" ]; then
-            if [ "$DEPLOY_STATUS" == "success" ]; then
+          if [ "$BRANCH" = "main" ]; then
+            if [ "$DEPLOY_STATUS" = "success" ]; then
               DEPLOY_FIELD='{ "name": "🚀 Deployment", "value": "✅ Success", "inline": true }'
               COLOR=5763719
             else
