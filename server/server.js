@@ -15,7 +15,7 @@ app.get("/{*splat}", (req, res) => {
   res.sendFile(path.join(__dirname, "../client/build/index.html"));
 });
 
-const PORT = 6767;
+const PORT = process.env.PORT || 6767;
 
 const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
