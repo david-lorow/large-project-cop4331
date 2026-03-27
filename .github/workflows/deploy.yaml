@@ -24,7 +24,11 @@ jobs:
           script: |
             set -e
             cd /root/large-project-cop4331
-            git pull origin main
+
+
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd
 
             cat > server/.env <<EOF
             PORT=${{ secrets.PORT }}
