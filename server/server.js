@@ -1,6 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const dotenv = require('dotenv');
+const connectDB = require('./config/db');
+const testDataRoutes = require('./routes/testData');
+
+dotenv.config();
+connectDB();
 
 const app = express();
 
@@ -24,6 +30,8 @@ app.use((req, res, next) => {
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working' });
 });
+
+app.use('/api', testDataRoutes);
 
 //Serve Vite build
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
