@@ -28,7 +28,7 @@ jobs:
 
             cat > server/.env <<EOF
             PORT=${{ secrets.PORT }}
-            MONGO_URI=${{ secrets.MONGO_URI }}
+            MONGO_URI=${{ secrets.MONGO_URI }}  
             EOF
 
             cd server
