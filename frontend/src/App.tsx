@@ -1,9 +1,17 @@
+import LoginPage from './pages/loginPage'
+import SignUpPage from './pages/signupPage'
+import { Routes, Route } from 'react-router-dom'
 
 function App() {
 
 
   return (
-    <div><p className='ml-16 mt-16'>ok the web server works</p></div>
+
+
+    <Routes>
+      <Route path="/" element={<LoginPage />} />
+      <Route path="/signup" element={<SignUpPage />} />
+    </Routes>
   )
 }
 
