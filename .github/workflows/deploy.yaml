@@ -30,9 +30,9 @@ jobs:
             git reset --hard origin/main
             git clean -fd
 
-            cat > server/.env <<EOF
+            cat > ./.env <<EOF
             PORT=${{ secrets.PORT }}
-            MONGO_URI=${{ secrets.MONGO_URI }}  
+            MONGO_URI=${{ secrets.MONGO_URI }}
             EOF
 
             cd server
