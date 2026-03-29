@@ -31,8 +31,8 @@ jobs:
             git clean -fd
 
             cat > ./.env <<EOF
-            PORT=${{ secrets.PORT }}
-            MONGO_URI=${{ secrets.MONGO_URI }}
+            ${{ secrets.PORT }}
+            ${{ secrets.MONGO_URI }}
             EOF
 
             cd server
