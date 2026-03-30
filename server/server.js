@@ -27,11 +27,7 @@ app.use((req, res, next) => {
 });
 
 //API routes go here
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'API is working' });
-});
 
-app.use('/api', testDataRoutes);
 
 //Serve Vite build
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
