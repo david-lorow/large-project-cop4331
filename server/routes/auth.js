@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { signToken } = require('../config/jwt');
-const { sendVerificationEmail } = require('../services/email');
+//const { sendVerificationEmail } = require('../services/email');
 
 const router = express.Router();
 
