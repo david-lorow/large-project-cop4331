@@ -3,7 +3,6 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
-const testDataRoutes = require('./routes/testData');
 
 dotenv.config();
 connectDB();
@@ -27,6 +26,9 @@ app.use((req, res, next) => {
 });
 
 //API routes go here
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API is working' });
+});
 
 
 //Serve Vite build
