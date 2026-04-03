@@ -1,0 +1,1 @@
+//JWT logic for DRY between auth.js and authMiddleware.js

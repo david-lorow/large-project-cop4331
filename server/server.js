@@ -12,19 +12,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-  );
-  res.setHeader(
-    'Access-Control-Allow-Methods',
-    'GET, POST, PATCH, DELETE, OPTIONS'
-  );
-  next();
-});
-
 //API routes go here
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working' });
@@ -32,8 +19,6 @@ app.get('/api/test', (req, res) => {
 
 
 //Serve Vite build
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
-
 app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
