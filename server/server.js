@@ -12,7 +12,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-//API routes go here
+//Serve static assets FIRST
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+//API routes
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working' });
 });
@@ -20,6 +23,10 @@ app.get('/api/test', (req, res) => {
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
+//Catch-all for SPA client-side routing 
+app.get('/*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
 
 //Serve Vite build
 app.get('/{*splat}', (req, res) => {
