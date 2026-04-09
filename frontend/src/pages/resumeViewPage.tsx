@@ -9,7 +9,7 @@ const ResumeDetailsPage = () => {
 
     // Mock Data
     const resumeName = "Resume Name"; 
-    const [applications, setApplications] = useState([
+    const [applications, _setApplications] = useState([
         { id: 1, company: 'Lockheed', status: 'Purgatory', date: '04/06/2026' }
     ]);
 
