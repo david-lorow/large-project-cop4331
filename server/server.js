@@ -15,6 +15,13 @@ app.use(express.json());
 //Serve static assets first
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
+//Error checker
+app.use((req, res, next) => {                                         
+  console.log(`${req.method} ${req.path} - body keys: ${Object.
+  keys(req.body || {}).join(', ') || 'none'}`);                  
+  next();                                                      
+  });   
+
 //API routes
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working' });
