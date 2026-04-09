@@ -30,7 +30,8 @@ jobs:
             git reset --hard origin/main
             git clean -fd
 
-            printf 'PORT=${{ secrets.PORT }}\n' > server/.env
+            > server/.env
+            printf 'PORT=${{ secrets.PORT }}\n' >> server/.env
             printf 'MONGO_URI=${{ secrets.MONGO_URI }}\n' >> server/.env
             printf 'JWT_SECRET=${{ secrets.JWT_SECRET }}\n' >> server/.env
             printf 'JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}\n' >> server/.env
