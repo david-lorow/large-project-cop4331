@@ -7,7 +7,7 @@ function Login() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
 
-    const base_url = "http://localhost:6767"
+    const base_url = "http://resumereaper.com"
 
     async function tryLogin(e: React.SubmitEvent): Promise<string | null> {
         e.preventDefault()

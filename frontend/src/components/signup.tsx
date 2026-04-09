@@ -11,7 +11,7 @@ function SignUp() {
 
     const [error, setError] = useState(null);
 
-    const base_url = "http://localhost:6767"
+    const base_url = "http://resumereaper.com"
 
     async function tryRegister(e: React.SubmitEvent): Promise<string | null> {
         e.preventDefault();
