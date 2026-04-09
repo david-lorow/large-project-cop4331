@@ -7,7 +7,6 @@ export interface AuthUser {
   id: string;
   firstName: string;
   lastName: string;
-  username: string;
   email: string;
 }
 
@@ -55,13 +54,12 @@ export const login = (email: string, password: string): Promise<LoginResponse> =
 export const register = (
   firstName: string,
   lastName: string,
-  username: string,
   email: string,
   password: string
 ): Promise<RegisterResponse> =>
   apiFetch<RegisterResponse>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ firstName, lastName, username, email, password }),
+    body: JSON.stringify({ firstName, lastName, email, password }),
   });
 
 export const verifyEmail = (token: string): Promise<{ message: string }> =>

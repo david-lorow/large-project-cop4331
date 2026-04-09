@@ -11,9 +11,9 @@ const router = express.Router();
 
 
 router.post('/register', async (req, res) => {
-  const { firstName, lastName, username, email, password } = req.body;
+  const { firstName, lastName, email, password } = req.body;
 
-  if (!firstName || !lastName || !username || !email || !password) {
+  if (!firstName || !lastName || !email || !password) {
     return res.status(400).json({ message: 'All fields are required.' });
   }
 
@@ -22,9 +22,9 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    const existing = await User.findOne({ $or: [{ email }] });
     if (existing) {
-      const field = existing.email === email ? 'email' : 'username';
+      const field = existing.email === email;
       return res.status(409).json({ message: `That ${field} is already in use.` });
     }
 
@@ -39,7 +39,6 @@ router.post('/register', async (req, res) => {
     const user = await User.create({
       firstName,
       lastName,
-      username,
       email,
       passwordHash,
       isEmailVerified: false,
@@ -101,7 +100,6 @@ router.post('/login', async (req, res) => {
         id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
-        username: user.username,
         email: user.email,
       },
     });
