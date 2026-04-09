@@ -1,6 +1,6 @@
 //This is the JWT fetch wrapper handling all protected calls
 
-const BASE_URL = 'http://localhost:6767/api';
+const BASE_URL = 'https://resumereaper.com/api';
 
 //Types
 export interface AuthUser {

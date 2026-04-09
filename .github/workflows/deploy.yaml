@@ -30,11 +30,18 @@ jobs:
             git reset --hard origin/main
             git clean -fd
 
-            cat > ./.env <<EOF
-            ${{ secrets.PORT }}
-            ${{ secrets.MONGO_URI }}
-            EOF
-
+              cat > server/.env <<EOF                                                       
+              PORT=${{ secrets.PORT }}                                                      
+              MONGO_URI=${{ secrets.MONGO_URI }}                                            
+              JWT_SECRET=${{ secrets.JWT_SECRET }}
+              JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}                                  
+              EMAIL_ENABLED=${{ secrets.EMAIL_ENABLED }}                                    
+              EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+              APP_URL=${{ secrets.APP_URL }}                                                
+              GRID_KEY=${{ secrets.GRID_KEY }}                                              
+              OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+              EOF
+              
             cd server
             npm install
 
