@@ -5,13 +5,10 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { signToken } = require('../config/jwt');
-//const { sendVerificationEmail } = require('../services/email');
+const { sendVerificationEmail } = require('../services/email');
 
 const router = express.Router();
 
-
-//POST /api/auth/register
-//No email veritifcation yet, and no JWT here, just the endpoint
 
 router.post('/register', async (req, res) => {
   const { firstName, lastName, username, email, password } = req.body;
@@ -34,7 +31,7 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     //Generate a verification token and store its hash so the raw token
-    // s never persisted (same pattern as password reset tokens).
+    //is never persisted (same pattern as password reset tokens).
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
     const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 h
