@@ -12,7 +12,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-//Serve static assets FIRST
+//Serve static assets first
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 //API routes
