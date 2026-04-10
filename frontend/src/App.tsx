@@ -3,6 +3,7 @@ import SignUpPage from './pages/signupPage'
 import HomePage from './pages/homePage'
 import ResumeViewPage from './pages/resumeViewPage'
 import VerifyEmailPage from './pages/verifyEmailPage'
+import AboutUsPage from './pages/aboutUsPage'
 import { Routes, Route } from 'react-router-dom'
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
       <Route path="/home" element={<HomePage />} />
       <Route path="/resume/:id" element={<ResumeViewPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/about" element={<AboutUsPage />} />
     </Routes>
   )
 }
