@@ -8,9 +8,9 @@ const ResumeDetailsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Mock Data
-    const resumeName = "Resume Name"; 
+    const resumeName = "Resume Number 1"; 
     const [applications, _setApplications] = useState([
-        { id: 1, company: 'Lockheed', status: 'Purgatory', date: '04/06/2026' }
+        { id: 1, company: 'Lockheed', position: 'Software Engineer', status: 'Ghosted', date: '04/06/2026' }
     ]);
 
     return (
@@ -24,7 +24,7 @@ const ResumeDetailsPage = () => {
                     
                     <div className="w-[85%] aspect-[1/1.4] bg-white shadow-2xl overflow-hidden">
                         <img 
-                            src="https://via.placeholder.com/600x800?text=John+Smith+Resume" 
+                            src="https://via.placeholder.com/600x800?text=John+Smith+Resume"
                             alt="Resume Preview" 
                             className="w-full h-full object-cover"
                         />
@@ -44,8 +44,8 @@ const ResumeDetailsPage = () => {
                         <div className="bg-[#232323] rounded-b-2xl p-6 min-h-[400px] shadow-2xl border-t border-black/20">
                             <div className="grid grid-cols-4 text-center text-sm mb-4 text-gray-300 font-light tracking-wide">
                                 <div>Company</div>
+                                <div>Position</div>
                                 <div>Status</div>
-                                <div>Reply</div>
                                 <div>Date Applied</div>
                             </div>
 
@@ -68,6 +68,7 @@ const ResumeDetailsPage = () => {
                             <option>Purgatory</option>
                             <option>Interview</option>
                             <option>Denied</option>
+                            <option>Ghosted</option>
                         </select>
                         <div className="flex gap-4">
                             <button onClick={() => setIsModalOpen(false)} className="flex-1 bg-gray-700 py-2 rounded-lg hover:bg-gray-600 cursor-pointer">Cancel</button>

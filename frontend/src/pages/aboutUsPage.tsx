@@ -3,11 +3,11 @@ import Gravestone from '../components/gravestone';
 
 // array of team members (hardcoded)
 const teamMembers = [
-    { id: 1, name: "Tyler Wyskochil", role: "Project Manager, Mobile Frontend", img: "/assets/tylerW.png" },
-    { id: 2, name: "Alex Weninski", role: "Web Frontend", img: "/assets/alexW.png" },
-    { id: 3, name: "David Lorow", role: "API Lead", img: "/assets/davidL.jpg" },
-    { id: 4, name: "Amanda Go", role: "Web Frontend", img: "/assets/amandaG.jpg" },
-    { id: 5, name: "Jeshua Casanola", role: "Database Lead", img: "/assets/jeshuaC.jpg" },
+    { id: 1, name: "Tyler Wyskochil", role: "Project Manager, Mobile Frontend", img: "/assets/tylerW.png", linked: "https://www.linkedin.com/in/tyler-wyskochil-ba305a32a"},
+    { id: 2, name: "Alex Weninski", role: "Web Frontend", img: "/assets/alexW.png", linked: "https://www.linkedin.com/in/aweninski/" },
+    { id: 3, name: "David Lorow", role: "API Lead", img: "/assets/davidL.jpg", linked: "https://www.linkedin.com/in/david-lorow/" },
+    { id: 4, name: "Amanda Go", role: "Web Frontend", img: "/assets/amandaG.jpg", linked: "https://www.linkedin.com/in/amandago30/" },
+    { id: 5, name: "Jeshua Casanola", role: "Database Lead", img: "/assets/jeshuaC.jpg", linked: "https://www.linkedin.com/in/jeshua-casanola-436609302/" },
 ];
 
 const AboutUs = () => {
