@@ -11,7 +11,7 @@ function AIReview() {
     const [targetJob, setTargetJob] = useState("");
     const [additionalContext, setAdditionalContext] = useState("");
 
-    const [resumes, setResumes] = useState([]);
+    const [_resumes, _setResumes] = useState([]);
     const [selectedResume, setSelectedResume] = useState("");
 
     return (

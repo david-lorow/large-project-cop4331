@@ -2,7 +2,7 @@ import { useState } from "react";
 
 function AISuggestions() {
 
-    const [suggestion, setSuggestion] = useState("AI Suggestion here");
+    const [suggestion, _setSuggestion] = useState("AI Suggestion here");
 
     return (
         <div className="bg-black h-full w-full flex items-center justify-center">
