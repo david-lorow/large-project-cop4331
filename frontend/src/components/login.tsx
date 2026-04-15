@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react';
 
 function Login() {
@@ -7,7 +7,8 @@ function Login() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
 
-    const base_url = "https://resumereaper.com"
+    const base_url = "https://resumereaper.com";
+    const navigate = useNavigate();
 
     async function tryLogin(e: React.SubmitEvent): Promise<string | null> {
         e.preventDefault()
@@ -30,8 +31,9 @@ function Login() {
             return null;
         }
 
-        const user = await resp.json()
-        console.log(user)
+        const user = await resp.json();
+        localStorage.setItem("token", user.token);
+        navigate('/home');
         return null;
     }
 
