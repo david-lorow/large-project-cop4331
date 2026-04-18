@@ -30,6 +30,9 @@ app.get('/api/test', (req, res) => {
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
+const resumeRoutes = require('./routes/resume');
+app.use('/api/resumes', resumeRoutes);
+
 //Catch-all for SPA client-side routing 
 app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
