@@ -87,7 +87,7 @@ const HomePage = () => {
             <Navbar />
 
             {/* Floating search bar */}
-            <div className="fixed top-20 left-6 z-40">
+            <div className="fixed top-24 left-10 z-40">
                 <div
                     className={`flex items-center bg-[#1a1a1a] border border-gray-700 rounded-full transition-all duration-300 overflow-hidden h-10 ${searchOpen ? 'w-72 shadow-lg shadow-black/50' : 'w-10'}`}
                 >

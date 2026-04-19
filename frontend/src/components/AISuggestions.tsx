@@ -5,7 +5,7 @@ function AISuggestions() {
     const [suggestion, _setSuggestion] = useState("AI Suggestion here");
 
     return (
-        <div className="bg-black h-full w-full flex items-center justify-center">
+        <div className="bg-black h-full w-full flex items-start justify-center pt-[7.75rem]">
             <div className="w-[70%]">
                 <p className="text-white text-small tracking-wide">Suggested Changes</p>
 
