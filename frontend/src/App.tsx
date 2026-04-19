@@ -5,6 +5,8 @@ import ResumeViewPage from './pages/resumeViewPage'
 import VerifyEmailPage from './pages/verifyEmailPage'
 import AboutUsPage from './pages/aboutUsPage'
 import AIReviewPage from './pages/aiReviewPage'
+import ForgotPasswordPage from './pages/forgotPasswordPage'
+import ResetPasswordPage from './pages/resetPasswordPage'
 import { Routes, Route } from 'react-router-dom'
 
 function App() {
@@ -21,6 +23,8 @@ function App() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/about" element={<AboutUsPage />} />
       <Route path="/ai" element={<AIReviewPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
     </Routes>
   )
 }

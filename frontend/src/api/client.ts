@@ -85,6 +85,18 @@ export const register = (
 export const verifyEmail = (token: string): Promise<{ message: string }> =>
   apiFetch<{ message: string }>(`/auth/verify-email?token=${encodeURIComponent(token)}`);
 
+export const forgotPassword = (email: string): Promise<{ message: string }> =>
+  apiFetch<{ message: string }>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
+export const resetPassword = (token: string, password: string): Promise<{ message: string }> =>
+  apiFetch<{ message: string }>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+
 //Resume endpoints
 
 export const listResumes = (): Promise<{ resumes: Resume[] }> =>

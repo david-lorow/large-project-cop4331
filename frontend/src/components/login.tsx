@@ -58,7 +58,10 @@ function Login() {
 
                     <input type="submit" className="mt-12 bg-[#8B0000] w-full p-1 border-black rounded-lg shadow-sm" />
                 </form>
-                <Link to="/signup" className="text-sm mt-3 text-gray-300 hover:text-gray-100">Don't have an account? Sign Up</Link>
+                <div className="flex justify-between items-center mt-3">
+                    <Link to="/signup" className="text-sm text-gray-300 hover:text-gray-100">Don't have an account? Sign Up</Link>
+                    <Link to="/forgot-password" className="text-sm text-gray-400 hover:text-gray-200">Forgot password?</Link>
+                </div>
             </div>
         </div>
     );
