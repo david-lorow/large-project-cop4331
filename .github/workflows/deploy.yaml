@@ -84,6 +84,22 @@ jobs:
         run: npm install --include=dev
         working-directory: server
 
+      - name: Wait for server to be ready
+        env:
+          BASE_URL: ${{ secrets.APP_URL }}
+        run: |
+          for i in $(seq 1 15); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/test" || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Server is ready."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Server did not become ready in time."
+          exit 1
+
       - name: Run smoke tests against production
         id: run_tests
         env:
