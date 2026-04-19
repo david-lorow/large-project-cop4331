@@ -88,10 +88,10 @@ jobs:
         env:
           BASE_URL: ${{ secrets.APP_URL }}
         run: |
-          for i in $(seq 1 15); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/test" || echo "000")
-            echo "Attempt $i: HTTP $STATUS"
-            if [ "$STATUS" = "200" ]; then
+          for i in $(seq 1 20); do
+            BODY=$(curl -s --max-time 5 "$BASE_URL/api/test" 2>/dev/null || echo "")
+            echo "Attempt $i: $BODY"
+            if echo "$BODY" | grep -q '"API is working"'; then
               echo "Server is ready."
               exit 0
             fi
