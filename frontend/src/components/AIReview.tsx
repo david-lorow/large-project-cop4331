@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { listResumes, reviewResume, Resume } from "../api/client";
+import { listResumes, reviewResume } from "../api/client";
+import type { Resume } from "../api/client";
 
 interface AIReviewProps {
     onStart: () => void;
