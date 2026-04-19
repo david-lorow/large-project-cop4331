@@ -31,7 +31,6 @@ function parseTextractBlocks(blocks) {
     .join('\n');
 }
 
-// Simple keyword extraction: strip stop words, return top 30 unique words by frequency
 const STOP_WORDS = new Set([
   'a','an','the','and','or','but','in','on','at','to','for','of','with',
   'by','from','is','was','are','were','be','been','being','have','has',
@@ -42,19 +41,74 @@ const STOP_WORDS = new Set([
   'other','some','such','than','then','too','very','just','can','also',
 ]);
 
+const JOB_TITLES = new Set([
+  // Leadership
+  'ceo','cto','cfo','coo','cpo','vp','svp','evp','president','founder',
+  'cofounder','partner','principal','director','head',
+  // Management
+  'manager','supervisor','coordinator','administrator','lead',
+  'superintendent','controller','operator',
+  // Engineering & Tech
+  'engineer','developer','architect','programmer','analyst',
+  'devops','sre','qa','tester','designer','researcher','scientist',
+  'technician','specialist','consultant','integrator',
+  // Software specific
+  'frontend','backend','fullstack','mobile','embedded','cloud',
+  'security','data','ml','ai','systems','network','database',
+  // Business & Sales
+  'sales','account','executive','representative','associate',
+  'advisor','strategist','recruiter','hr','marketing','brand',
+  'product','project','operations','finance','legal','compliance',
+  // Seniority qualifiers (caught as adjacent words)
+  'senior','junior','staff','principal','mid','entry','intern',
+  'apprentice','contractor','freelance',
+  // Common role nouns
+  'officer','agent','broker','trader','underwriter','auditor',
+  'attorney','counsel','paralegal','nurse','doctor','physician',
+]);
+
 function extractKeywords(text) {
+  const lower = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+  const words = lower.split(/\s+/).filter((w) => w.length > 2);
+
+  // Pass 1: frequency-based general keywords (existing behavior)
   const freq = {};
-  text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+  words
+    .filter((w) => !STOP_WORDS.has(w))
     .forEach((w) => { freq[w] = (freq[w] || 0) + 1; });
 
-  return Object.entries(freq)
+  const frequencyKeywords = Object.entries(freq)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 30)
+    .slice(0, 20)
     .map(([word]) => word);
+
+  // Pass 2: explicit job title matches (preserves original casing from source text)
+  const titleKeywords = [];
+  const sourceWords = text.split(/\s+/);
+  for (let i = 0; i < sourceWords.length; i++) {
+    const clean = sourceWords[i].toLowerCase().replace(/[^a-z]/g, '');
+    if (JOB_TITLES.has(clean) && !titleKeywords.includes(sourceWords[i])) {
+      // Also grab the preceding word if it's a seniority qualifier
+      const prev = i > 0 ? sourceWords[i - 1].toLowerCase().replace(/[^a-z]/g, '') : '';
+      if (prev && JOB_TITLES.has(prev)) {
+        const combined = `${sourceWords[i - 1]} ${sourceWords[i]}`;
+        if (!titleKeywords.includes(combined)) titleKeywords.push(combined);
+      } else {
+        titleKeywords.push(sourceWords[i]);
+      }
+    }
+  }
+
+  // Merge: title keywords first (higher signal), then frequency keywords, deduped
+  const seen = new Set();
+  const merged = [...titleKeywords, ...frequencyKeywords].filter((w) => {
+    const key = w.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return merged.slice(0, 30);
 }
 
 // POST /api/resumes/upload
