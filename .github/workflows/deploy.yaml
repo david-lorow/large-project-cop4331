@@ -40,7 +40,7 @@ jobs:
             printf 'APP_URL=${{ secrets.APP_URL }}\n' >> server/.env
             printf 'GRID_KEY=${{ secrets.GRID_KEY }}\n' >> server/.env
             printf 'OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}\n' >> server/.env
-              
+
             cd server
             npm install
 
@@ -63,10 +63,48 @@ jobs:
             echo "status=failure" >> "$GITHUB_OUTPUT"
           fi
 
+  smoke-test:
+    name: Post-Deploy Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: needs.deploy.outputs.status == 'success'
+    outputs:
+      status: ${{ steps.set_smoke_status.outputs.status }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install server dev dependencies
+        run: npm install --include=dev
+        working-directory: server
+
+      - name: Run smoke tests against production
+        id: run_tests
+        env:
+          BASE_URL: ${{ secrets.APP_URL }}
+        run: npx jest --testTimeout=15000 --forceExit --verbose
+        working-directory: server
+
+      - name: Set smoke test status
+        id: set_smoke_status
+        if: always()
+        run: |
+          if [ "${{ steps.run_tests.outcome }}" = "success" ]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+          fi
+
   notify:
     name: Discord Notification
     runs-on: ubuntu-latest
-    needs: deploy
+    needs: [deploy, smoke-test]
     if: always()
 
     steps:
@@ -80,17 +118,25 @@ jobs:
           COMMIT_URL: ${{ github.event.head_commit.url }}
           TIMESTAMP: ${{ github.event.head_commit.timestamp }}
           DEPLOY_STATUS: ${{ needs.deploy.outputs.status }}
+          SMOKE_STATUS: ${{ needs.smoke-test.outputs.status }}
         run: |
           if [ "$BRANCH" = "main" ]; then
-            if [ "$DEPLOY_STATUS" = "success" ]; then
+            if [ "$DEPLOY_STATUS" = "success" ] && [ "$SMOKE_STATUS" = "success" ]; then
               DEPLOY_FIELD='{ "name": "🚀 Deployment", "value": "✅ Success", "inline": true }'
+              SMOKE_FIELD='{ "name": "🧪 Smoke Tests", "value": "✅ Passed", "inline": true }'
               COLOR=5763719
+            elif [ "$DEPLOY_STATUS" = "success" ] && [ "$SMOKE_STATUS" = "failure" ]; then
+              DEPLOY_FIELD='{ "name": "🚀 Deployment", "value": "✅ Success", "inline": true }'
+              SMOKE_FIELD='{ "name": "🧪 Smoke Tests", "value": "❌ Failed — API may be down!", "inline": true }'
+              COLOR=15548997
             else
               DEPLOY_FIELD='{ "name": "🚀 Deployment", "value": "❌ Failed", "inline": true }'
+              SMOKE_FIELD='{ "name": "🧪 Smoke Tests", "value": "⏭️ Skipped", "inline": true }'
               COLOR=15548997
             fi
           else
             DEPLOY_FIELD='{ "name": "🚀 Deployment", "value": "⏭️ Skipped (not main)", "inline": true }'
+            SMOKE_FIELD='{ "name": "🧪 Smoke Tests", "value": "⏭️ Skipped (not main)", "inline": true }'
             COLOR=16776960
           fi
 
@@ -104,6 +150,7 @@ jobs:
                 { "name": "👤 Contributor", "value": "$COMMITTER_NAME", "inline": true },
                 { "name": "🌿 Branch", "value": "$BRANCH", "inline": true },
                 $DEPLOY_FIELD,
+                $SMOKE_FIELD,
                 { "name": "💬 Commit Message", "value": "$COMMIT_MESSAGE", "inline": false }
               ],
               "footer": { "text": "GitHub Actions" },
