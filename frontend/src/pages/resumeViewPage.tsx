@@ -1,39 +1,78 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getResume } from '../api/client';
+import type { Resume } from '../api/client';
 import ApplicationPill from '../components/applicationPill';
-import Navbar from '../components/navBar'; 
+import Navbar from '../components/navBar';
 
-const ResumeDetailsPage = () => {
+const ResumeViewPage = () => {
+    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [resume, setResume] = useState<Resume | null>(null);
+    const [downloadUrl, setDownloadUrl] = useState<string>('');
+    const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Mock Data
-    const resumeName = "Resume Number 1"; 
+    // Mock applications — wiring to real API is a future task
     const [applications, _setApplications] = useState([
         { id: 1, company: 'Lockheed', position: 'Software Engineer', status: 'Ghosted', date: '04/06/2026' }
     ]);
+
+    useEffect(() => {
+        if (!id) return;
+        getResume(id)
+            .then(({ resume, downloadUrl }) => {
+                setResume(resume);
+                setDownloadUrl(downloadUrl);
+            })
+            .catch(console.error)
+            .finally(() => setLoading(false));
+    }, [id]);
+
+    const handlePrint = () => {
+        if (!downloadUrl) return;
+        const w = window.open(downloadUrl, '_blank');
+        if (w) w.addEventListener('load', () => w.print());
+    };
 
     return (
         <div className="flex flex-col h-screen bg-[#1a1a1a] text-white overflow-hidden">
             <Navbar />
 
             <div className="flex flex-1 overflow-hidden">
-                <div className="w-5/12 bg-black flex flex-col items-center justify-center p-10 border-r border-black shrink-0 relative">
-                    
-                    <h2 className="text-2xl mb-6 font-normal">{resumeName}</h2>
-                    
-                    <div className="w-[85%] aspect-[1/1.4] bg-white shadow-2xl overflow-hidden">
-                        <img 
-                            src="https://via.placeholder.com/600x800?text=John+Smith+Resume"
-                            alt="Resume Preview" 
-                            className="w-full h-full object-cover"
-                        />
+                {/* Left: PDF viewer */}
+                <div className="w-5/12 bg-black flex flex-col items-center p-10 border-r border-black shrink-0">
+                    <div className="flex items-center justify-between w-[85%] mb-4">
+                        <h2 className="text-2xl font-normal truncate">
+                            {loading ? 'Loading...' : (resume?.title ?? 'Resume')}
+                        </h2>
+                        <button
+                            onClick={handlePrint}
+                            disabled={!downloadUrl}
+                            className="ml-4 px-4 py-1.5 bg-white text-black rounded-lg text-sm font-medium hover:bg-gray-200 transition-all cursor-pointer disabled:opacity-40"
+                        >
+                            Print
+                        </button>
+                    </div>
+
+                    <div className="w-[85%] flex-1 shadow-2xl overflow-hidden">
+                        {downloadUrl ? (
+                            <iframe
+                                src={downloadUrl}
+                                className="w-full h-full"
+                                title="Resume PDF"
+                            />
+                        ) : (
+                            <div className="w-full h-full bg-white flex items-center justify-center text-gray-400">
+                                {loading ? 'Loading PDF...' : 'PDF unavailable'}
+                            </div>
+                        )}
                     </div>
                 </div>
 
+                {/* Right: Applications */}
                 <div className="w-7/12 p-8 overflow-y-auto bg-[#1a1a1a]">
                     <div className="max-w-3xl mx-auto">
-                        
                         <button onClick={() => navigate('/home')} className="mt-1 mb-12 text-3xl hover:text-gray-400 transition-colors cursor-pointer flex items-center">←</button>
 
                         <div className="bg-[#8B0000] rounded-t-2xl p-4 flex justify-between items-center shadow-lg">
@@ -79,6 +118,6 @@ const ResumeDetailsPage = () => {
             )}
         </div>
     );
-}
+};
 
-export default ResumeDetailsPage;
+export default ResumeViewPage;

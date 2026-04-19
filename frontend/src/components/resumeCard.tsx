@@ -1,4 +1,4 @@
-import { getResume } from '../api/client';
+import { useNavigate } from 'react-router-dom';
 
 interface ResumeCardProps {
     id: string;
@@ -9,17 +9,8 @@ interface ResumeCardProps {
 }
 
 const ResumeCard = ({ id, name, date, thumbnailUrl, onDelete }: ResumeCardProps) => {
-    const handleView = async () => {
-        const newTab = window.open('', '_blank');
-        if (!newTab) return;
-        try {
-            const { downloadUrl } = await getResume(id);
-            newTab.location.href = downloadUrl;
-        } catch (err) {
-            newTab.close();
-            console.error('Failed to open PDF:', err);
-        }
-    };
+    const navigate = useNavigate();
+    const handleView = () => navigate(`/resume/${id}`);
 
     return (
         <div className="group relative bg-[#232323] rounded-[40px] p-8 flex flex-col items-center transition-all duration-300 hover:bg-[#222222] border border-transparent hover:border-gray-700">
