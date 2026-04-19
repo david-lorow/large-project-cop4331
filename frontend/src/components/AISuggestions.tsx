@@ -1,3 +1,5 @@
+import { marked } from "marked";
+
 interface AISuggestionsProps {
     suggestion: string;
     isLoading: boolean;
@@ -12,12 +14,13 @@ function AISuggestions({ suggestion, isLoading }: AISuggestionsProps) {
                     {isLoading && <span className="ml-2 text-gray-400 text-xs animate-pulse">Generating...</span>}
                 </p>
 
-                <textarea
-                    rows={22}
-                    readOnly
-                    className="bg-white text-base resize-none w-full shadow-lg rounded-sm mt-3 p-2"
-                    value={suggestion || (isLoading ? "" : "Submit a review request to see suggestions here.")}
-                    placeholder={isLoading ? "Generating suggestions..." : ""}
+                <div
+                    className="bg-white text-base w-full shadow-lg rounded-sm mt-3 p-4 h-[550px] overflow-y-auto"
+                    dangerouslySetInnerHTML={{
+                        __html: marked.parse(
+                            suggestion || (isLoading ? "" : "Submit a review request to see suggestions here.")
+                        ),
+                    }}
                 />
             </div>
         </div>
