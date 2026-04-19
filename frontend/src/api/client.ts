@@ -109,6 +109,9 @@ export const uploadResume = async (file: File, title: string): Promise<{ resume:
 export const deleteResume = (id: string): Promise<{ message: string }> =>
   apiFetch<{ message: string }>(`/resumes/${id}`, { method: 'DELETE' });
 
+export const searchResumes = (q: string): Promise<{ resumes: Resume[] }> =>
+  apiFetch<{ resumes: Resume[] }>(`/resumes/search?q=${encodeURIComponent(q)}`);
+
 export const getResumePdfUrl = (id: string): string => `${BASE_URL}/resumes/${id}/pdf`;
 
 export const getResume = (id: string): Promise<{ resume: Resume; downloadUrl: string }> =>

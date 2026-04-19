@@ -53,7 +53,11 @@ const ResumeCard = ({ id, name, date, thumbnailUrl, onDelete }: ResumeCardProps)
                 </button>
                 <button
                     className="w-32 py-2 bg-[#8B0000] text-white rounded-lg font-semibold hover:bg-red-700 cursor-pointer"
-                    onClick={() => onDelete(id)}
+                    onClick={() => {
+                        if (window.confirm(`Delete "${name}"? This cannot be undone.`)) {
+                            onDelete(id);
+                        }
+                    }}
                 >
                     Delete
                 </button>

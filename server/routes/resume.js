@@ -228,6 +228,56 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+// GET /api/resumes/search?q=<query>
+// Keyword search across the authenticated user's resumes, ranked by match score.
+router.get('/search', protect, async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json({ resumes: [] });
+
+  const queryWords = [...new Set(
+    q.toLowerCase().split(/\s+/).filter((w) => w.length > 1),
+  )];
+
+  try {
+    const resumes = await Resume.find({
+      userId: req.user._id,
+      $or: [
+        { keywords: { $in: queryWords } },
+        { title: { $regex: queryWords.join('|'), $options: 'i' } },
+      ],
+    })
+      .select('-extractedText')
+      .lean();
+
+    // Score by number of query words found in the resume's keyword list
+    const scored = resumes
+      .map((r) => {
+        const kws = (r.keywords || []).map((k) => k.toLowerCase());
+        const score = queryWords.reduce((acc, w) => acc + (kws.includes(w) ? 1 : 0), 0);
+        return { r, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const resumesWithThumbnails = await Promise.all(
+      scored.map(async ({ r }) => {
+        if (r.thumbnailS3Key) {
+          r.thumbnailUrl = await getSignedUrl(
+            s3,
+            new GetObjectCommand({ Bucket: BUCKET, Key: r.thumbnailS3Key }),
+            { expiresIn: 60 * 15 },
+          );
+        }
+        return r;
+      }),
+    );
+
+    return res.json({ resumes: resumesWithThumbnails });
+  } catch (err) {
+    console.error('Resume search error:', err);
+    return res.status(500).json({ message: 'Search failed.' });
+  }
+});
+
 // GET /api/resumes/:id
 // Get a single resume with a short-lived presigned S3 download URL.
 router.get('/:id', protect, async (req, res) => {

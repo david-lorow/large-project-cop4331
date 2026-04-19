@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ResumeCard from '../components/resumeCard';
 import Navbar from '../components/navBar';
-import { getUser, listResumes, uploadResume, deleteResume, type Resume } from '../api/client';
+import { getUser, listResumes, uploadResume, deleteResume, searchResumes, type Resume } from '../api/client';
 
 const HomePage = () => {
     const user = getUser();
@@ -13,9 +13,37 @@ const HomePage = () => {
     const [pendingTitle, setPendingTitle] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<Resume[]>([]);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         listResumes().then(({ resumes }) => setResumes(resumes)).catch(console.error);
     }, []);
+
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setSearchResults([]);
+            return;
+        }
+        let cancelled = false;
+        searchResumes(searchQuery)
+            .then(({ resumes }) => { if (!cancelled) setSearchResults(resumes); })
+            .catch(console.error);
+        return () => { cancelled = true; };
+    }, [searchQuery]);
+
+    const openSearch = () => {
+        setSearchOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+    };
+
+    const closeSearch = () => {
+        setSearchOpen(false);
+        setSearchQuery('');
+        setSearchResults([]);
+    };
 
     const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -52,9 +80,51 @@ const HomePage = () => {
     const formatDate = (iso: string) =>
         new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+    const displayedResumes = searchQuery.trim() ? searchResults : resumes;
+
     return (
         <div className="min-h-screen bg-black text-white font-sans">
             <Navbar />
+
+            {/* Floating search bar */}
+            <div className="fixed top-20 left-6 z-40">
+                <div
+                    className={`flex items-center bg-[#1a1a1a] border border-gray-700 rounded-full transition-all duration-300 overflow-hidden h-10 ${searchOpen ? 'w-72 shadow-lg shadow-black/50' : 'w-10'}`}
+                >
+                    <button
+                        className="w-10 h-10 flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                        onClick={openSearch}
+                        aria-label="Search resumes"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                        </svg>
+                    </button>
+                    {searchOpen && (
+                        <>
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                placeholder="Search resumes…"
+                                className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-500 min-w-0"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Escape' && closeSearch()}
+                            />
+                            <button
+                                className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-gray-500 hover:text-white transition-colors cursor-pointer"
+                                onClick={closeSearch}
+                                aria-label="Close search"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
 
             <main className="flex flex-col items-center pt-16 px-6">
                 <h1 className="text-4xl font-medium mb-8">{userName}'s Resume Portfolio</h1>
@@ -77,16 +147,20 @@ const HomePage = () => {
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 w-full max-w-6xl pb-20">
-                    {resumes.map((resume) => (
-                        <ResumeCard
-                            key={resume._id}
-                            id={resume._id}
-                            name={resume.title}
-                            date={formatDate(resume.createdAt)}
-                            thumbnailUrl={resume.thumbnailUrl}
-                            onDelete={handleDelete}
-                        />
-                    ))}
+                    {displayedResumes.length === 0 && searchQuery.trim() ? (
+                        <p className="col-span-3 text-center text-gray-500 mt-8">No resumes match "{searchQuery}"</p>
+                    ) : (
+                        displayedResumes.map((resume) => (
+                            <ResumeCard
+                                key={resume._id}
+                                id={resume._id}
+                                name={resume.title}
+                                date={formatDate(resume.createdAt)}
+                                thumbnailUrl={resume.thumbnailUrl}
+                                onDelete={handleDelete}
+                            />
+                        ))
+                    )}
                 </div>
             </main>
 
