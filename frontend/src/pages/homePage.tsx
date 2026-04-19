@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ResumeCard from '../components/resumeCard';
 import Navbar from '../components/navBar';
-import { getUser, listResumes, uploadResume, deleteResume, getResumePdfUrl, type Resume } from '../api/client';
+import { getUser, listResumes, uploadResume, deleteResume, type Resume } from '../api/client';
 
 const HomePage = () => {
     const user = getUser();
@@ -83,7 +83,7 @@ const HomePage = () => {
                             id={resume._id}
                             name={resume.title}
                             date={formatDate(resume.createdAt)}
-                            pdfUrl={getResumePdfUrl(resume._id)}
+                            thumbnailUrl={resume.thumbnailUrl}
                             onDelete={handleDelete}
                         />
                     ))}

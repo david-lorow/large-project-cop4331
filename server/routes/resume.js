@@ -9,6 +9,7 @@ const { DetectDocumentTextCommand } = require('@aws-sdk/client-textract');
 const { s3, textract } = require('../config/s3');
 const { protect } = require('../middleware/authMiddleware');
 const Resume = require('../models/Resume');
+const { generateThumbnail } = require('../services/thumbnail');
 
 const router = express.Router();
 const upload = multer({
@@ -82,7 +83,24 @@ router.post('/upload', protect, upload.single('resume'), async (req, res) => {
       })
     );
 
-    // 2. Run Textract (synchronous — fine for single-page resumes)
+    // 2. Generate thumbnail (non-fatal)
+    let thumbnailS3Key = null;
+    try {
+      const thumbnailBuffer = await generateThumbnail(req.file.buffer);
+      thumbnailS3Key = `thumbnails/${req.user._id}/${uuidv4()}.jpg`;
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: thumbnailS3Key,
+          Body: thumbnailBuffer,
+          ContentType: 'image/jpeg',
+        })
+      );
+    } catch (thumbErr) {
+      console.error('Thumbnail generation error:', thumbErr.message);
+    }
+
+    // 3. Run Textract (synchronous — fine for single-page resumes)
     let extractedText = '';
     let keywords = [];
     try {
@@ -98,7 +116,7 @@ router.post('/upload', protect, upload.single('resume'), async (req, res) => {
       console.error('Textract error:', textractErr.message);
     }
 
-    // 3. Persist metadata to MongoDB
+    // 4. Persist metadata to MongoDB
     const resume = await Resume.create({
       userId: req.user._id,
       title,
@@ -108,9 +126,19 @@ router.post('/upload', protect, upload.single('resume'), async (req, res) => {
       originalFileName: req.file.originalname,
       extractedText,
       keywords,
+      thumbnailS3Key,
     });
 
-    return res.status(201).json({ resume });
+    let thumbnailUrl = null;
+    if (thumbnailS3Key) {
+      thumbnailUrl = await getSignedUrl(
+        s3,
+        new GetObjectCommand({ Bucket: BUCKET, Key: thumbnailS3Key }),
+        { expiresIn: 60 * 15 }
+      );
+    }
+
+    return res.status(201).json({ resume: { ...resume.toObject(), thumbnailUrl } });
   } catch (err) {
     console.error('Resume upload error:', err);
     return res.status(500).json({ message: 'Upload failed.' });
@@ -124,7 +152,22 @@ router.get('/', protect, async (req, res) => {
     const resumes = await Resume.find({ userId: req.user._id })
       .select('-extractedText')
       .sort({ createdAt: -1 });
-    return res.json({ resumes });
+
+    const resumesWithThumbnails = await Promise.all(
+      resumes.map(async (r) => {
+        const obj = r.toObject();
+        if (r.thumbnailS3Key) {
+          obj.thumbnailUrl = await getSignedUrl(
+            s3,
+            new GetObjectCommand({ Bucket: BUCKET, Key: r.thumbnailS3Key }),
+            { expiresIn: 60 * 15 }
+          );
+        }
+        return obj;
+      })
+    );
+
+    return res.json({ resumes: resumesWithThumbnails });
   } catch (err) {
     console.error('Resume list error:', err);
     return res.status(500).json({ message: 'Failed to fetch resumes.' });
@@ -179,6 +222,9 @@ router.delete('/:id', protect, async (req, res) => {
     if (!resume) return res.status(404).json({ message: 'Resume not found.' });
 
     await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: resume.s3Key }));
+    if (resume.thumbnailS3Key) {
+      await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: resume.thumbnailS3Key }));
+    }
     await resume.deleteOne();
 
     return res.json({ message: 'Resume deleted.' });

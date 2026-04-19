@@ -28,6 +28,7 @@ export interface Resume {
   originalFileName: string;
   keywords: string[];
   createdAt: string;
+  thumbnailUrl?: string; // presigned S3 URL for the page-1 JPEG thumbnail
 }
 
 //Token helpers
