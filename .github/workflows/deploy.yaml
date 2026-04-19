@@ -54,6 +54,7 @@ jobs:
 
             cd ..
             pm2 delete large-project-cop4331 || true
+            pm2 delete myserver || true
             pm2 start server/server.js --name large-project-cop4331
             pm2 save
 

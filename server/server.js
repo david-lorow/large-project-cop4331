@@ -50,6 +50,7 @@ const server = app.listen(PORT, () => {
 
 server.on('error', (err) => {
   console.error('Server error:', err);
+  process.exit(1);
 });
 
 process.on('uncaughtException', (err) => {
