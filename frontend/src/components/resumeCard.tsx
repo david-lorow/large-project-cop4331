@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { getToken } from '../api/client';
+import { getToken, getResume } from '../api/client';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -63,14 +63,14 @@ const ResumeCard = ({ id, name, date, pdfUrl, onDelete }: ResumeCardProps) => {
     }, [pdfUrl]);
 
     const handleView = async () => {
+        // Open the tab immediately (trusted click context) to avoid popup blockers
+        const newTab = window.open('', '_blank');
+        if (!newTab) return;
         try {
-            const res = await fetch(pdfUrl, {
-                headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-            });
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
+            const { downloadUrl } = await getResume(id);
+            newTab.location.href = downloadUrl;
         } catch (err) {
+            newTab.close();
             console.error('Failed to open PDF:', err);
         }
     };

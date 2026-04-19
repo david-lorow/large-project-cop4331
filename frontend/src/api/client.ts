@@ -109,3 +109,6 @@ export const deleteResume = (id: string): Promise<{ message: string }> =>
   apiFetch<{ message: string }>(`/resumes/${id}`, { method: 'DELETE' });
 
 export const getResumePdfUrl = (id: string): string => `${BASE_URL}/resumes/${id}/pdf`;
+
+export const getResume = (id: string): Promise<{ resume: Resume; downloadUrl: string }> =>
+  apiFetch<{ resume: Resume; downloadUrl: string }>(`/resumes/${id}`);
