@@ -238,22 +238,28 @@ router.get('/search', protect, async (req, res) => {
     q.toLowerCase().split(/\s+/).filter((w) => w.length > 1),
   )];
 
+  // Prefix-match regexes so "pr" matches "president", "programming", etc.
+  const keywordRegexes = queryWords.map((w) => new RegExp(`^${w}`, 'i'));
+
   try {
     const resumes = await Resume.find({
       userId: req.user._id,
       $or: [
-        { keywords: { $in: queryWords } },
+        { keywords: { $in: keywordRegexes } },
         { title: { $regex: queryWords.join('|'), $options: 'i' } },
       ],
     })
       .select('-extractedText')
       .lean();
 
-    // Score by number of query words found in the resume's keyword list
+    // Score by number of query words that prefix-match any keyword
     const scored = resumes
       .map((r) => {
         const kws = (r.keywords || []).map((k) => k.toLowerCase());
-        const score = queryWords.reduce((acc, w) => acc + (kws.includes(w) ? 1 : 0), 0);
+        const score = queryWords.reduce(
+          (acc, w) => acc + (kws.some((k) => k.startsWith(w)) ? 1 : 0),
+          0,
+        );
         return { r, score };
       })
       .sort((a, b) => b.score - a.score);

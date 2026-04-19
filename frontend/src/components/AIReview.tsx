@@ -27,7 +27,7 @@ function AIReview() {
 
                 <div className=" w-full flex justify-center">
                     {reviewToggle ?
-                        <form className="w-[70%] mt-28">
+                        <form className="w-[70%] mt-28 pb-10">
                             <label htmlFor="targetJob" className="text-white tracking-wide">Target Job</label><br />
                             <input className="mt-2 mb-5 bg-white rounded-sm shadow-lg w-full p-1" type="text" id="targetJob" value={targetJob} onChange={e => setTargetJob(e.target.value)}></input>
 
@@ -42,7 +42,7 @@ function AIReview() {
                             <button type="submit" className="bg-[#8B0000] text-white w-full rounded-sm shadow-lg h-8 mt-16 hover:bg-[#AB0202]">Submit</button>
 
                         </form> :
-                        <form className="w-[70%] mt-20">
+                        <form className="w-[70%] mt-20 pb-10">
                             <label htmlFor="company" className="text-white tracking-wide">Company</label><br />
                             <input className="mt-2 mb-5 bg-white rounded-sm shadow-lg w-full p-1" type="text" id="company" value={company} onChange={e => setCompany(e.target.value)}></input>
 
