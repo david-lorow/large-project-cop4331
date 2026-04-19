@@ -12,15 +12,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-//Serve static assets first
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
-
 //Error checker
-app.use((req, res, next) => {                                         
+app.use((req, res, next) => {
   console.log(`${req.method} ${req.path} - body keys: ${Object.
-  keys(req.body || {}).join(', ') || 'none'}`);                  
-  next();                                                      
-  });   
+  keys(req.body || {}).join(', ') || 'none'}`);
+  next();
+  });
 
 //API routes
 app.get('/api/test', (req, res) => {
@@ -33,7 +30,10 @@ app.use('/api/auth', authRoutes);
 const resumeRoutes = require('./routes/resume');
 app.use('/api/resumes', resumeRoutes);
 
-//Catch-all for SPA client-side routing 
+//Serve static assets (after API routes so they take priority)
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+//Catch-all for SPA client-side routing
 app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
