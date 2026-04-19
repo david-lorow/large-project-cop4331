@@ -1,8 +1,13 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { clearToken, clearUser } from '../api/client';
 
 const Navbar = () => {
+    const navigate = useNavigate();
+
     const handleLogout = () => {
-        console.log("User logged out");
+        clearToken();
+        clearUser();
+        navigate('/');
     };
 
     return (
