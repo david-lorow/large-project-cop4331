@@ -116,3 +116,42 @@ export const getResumePdfUrl = (id: string): string => `${BASE_URL}/resumes/${id
 
 export const getResume = (id: string): Promise<{ resume: Resume; downloadUrl: string }> =>
   apiFetch<{ resume: Resume; downloadUrl: string }>(`/resumes/${id}`);
+
+//AI review endpoint — streams plain text chunks via onChunk callback
+export interface ReviewParams {
+  resumeId: string;
+  mode: 'tailoring' | 'review';
+  company?: string;
+  position?: string;
+  jobDescription?: string;
+  targetJob?: string;
+  additionalContext?: string;
+}
+
+export const reviewResume = async (
+  params: ReviewParams,
+  onChunk: (text: string) => void
+): Promise<void> => {
+  const token = getToken();
+  const res = await fetch(`${BASE_URL}/ai/review`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message ?? 'Review failed');
+  }
+
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    onChunk(decoder.decode(value, { stream: true }));
+  }
+};

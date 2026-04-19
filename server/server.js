@@ -30,6 +30,9 @@ app.use('/api/auth', authRoutes);
 const resumeRoutes = require('./routes/resume');
 app.use('/api/resumes', resumeRoutes);
 
+const aiRoutes = require('./routes/ai');
+app.use('/api/ai', aiRoutes);
+
 //Serve static assets (after API routes so they take priority)
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
