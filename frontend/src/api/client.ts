@@ -1,6 +1,6 @@
 //This is the JWT fetch wrapper handling all protected calls
 
-const BASE_URL = 'https://resumereaper.com/api';
+export const BASE_URL = 'https://resumereaper.com/api';
 
 //Types
 export interface AuthUser {
@@ -20,11 +20,30 @@ export interface RegisterResponse {
   userId: string;
 }
 
-//Token helperes
+export interface Resume {
+  _id: string;
+  title: string;
+  versionName?: string;
+  notes?: string;
+  originalFileName: string;
+  keywords: string[];
+  createdAt: string;
+}
+
+//Token helpers
 
 export const getToken = (): string | null => localStorage.getItem('token');
 export const setToken = (token: string): void => localStorage.setItem('token', token);
 export const clearToken = (): void => localStorage.removeItem('token');
+
+//User helpers
+
+export const getUser = (): AuthUser | null => {
+  const raw = localStorage.getItem('user');
+  return raw ? (JSON.parse(raw) as AuthUser) : null;
+};
+export const setUser = (user: AuthUser): void => localStorage.setItem('user', JSON.stringify(user));
+export const clearUser = (): void => localStorage.removeItem('user');
 
 //Base fetch with JWT header
 
@@ -64,3 +83,29 @@ export const register = (
 
 export const verifyEmail = (token: string): Promise<{ message: string }> =>
   apiFetch<{ message: string }>(`/auth/verify-email?token=${encodeURIComponent(token)}`);
+
+//Resume endpoints
+
+export const listResumes = (): Promise<{ resumes: Resume[] }> =>
+  apiFetch<{ resumes: Resume[] }>('/resumes');
+
+export const uploadResume = async (file: File, title: string): Promise<{ resume: Resume }> => {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('resume', file);
+  formData.append('title', title);
+
+  const res = await fetch(`${BASE_URL}/resumes/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message ?? 'Upload failed');
+  return data;
+};
+
+export const deleteResume = (id: string): Promise<{ message: string }> =>
+  apiFetch<{ message: string }>(`/resumes/${id}`, { method: 'DELETE' });
+
+export const getResumePdfUrl = (id: string): string => `${BASE_URL}/resumes/${id}/pdf`;

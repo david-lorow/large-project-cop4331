@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react';
+import { setUser } from '../api/client';
 
 function Login() {
 
@@ -33,6 +34,7 @@ function Login() {
 
         const user = await resp.json();
         localStorage.setItem("token", user.token);
+        setUser(user.user);
         navigate('/home');
         return null;
     }

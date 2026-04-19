@@ -151,6 +151,26 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
+// GET /api/resumes/:id/pdf
+// Proxy the PDF through the server so the browser avoids S3 CORS restrictions.
+router.get('/:id/pdf', protect, async (req, res) => {
+  try {
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!resume) return res.status(404).json({ message: 'Resume not found.' });
+
+    const s3Response = await s3.send(
+      new GetObjectCommand({ Bucket: BUCKET, Key: resume.s3Key })
+    );
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${resume.originalFileName}"`);
+    s3Response.Body.pipe(res);
+  } catch (err) {
+    console.error('PDF proxy error:', err);
+    return res.status(500).json({ message: 'Failed to fetch PDF.' });
+  }
+});
+
 // DELETE /api/resumes/:id
 // Remove from S3 and MongoDB.
 router.delete('/:id', protect, async (req, res) => {
