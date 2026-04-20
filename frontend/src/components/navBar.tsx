@@ -19,6 +19,7 @@ const Navbar = () => {
             </Link>
 
             <div className="flex items-center gap-12">
+                <Link to="/home" className="text-xl text-white font-light hover:text-gray-400 transition-colors">Home</Link>
                 <Link to="/ai" className="text-xl text-white font-light hover:text-gray-400 transition-colors">AI Review</Link>
                 <Link to="/about" className="text-xl text-white font-light hover:text-gray-400 transition-colors">About Us</Link>
                 <button onClick={handleLogout} className="text-xl text-white font-light hover:text-gray-400 transition-colors cursor-pointer bg-transparent border-none p-0">Logout</button>
