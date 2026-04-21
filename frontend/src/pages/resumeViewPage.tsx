@@ -247,14 +247,8 @@ const ResumeViewPage = () => {
                                 ) : (
                                     applications.map((app) => (
                                         <div key={app._id} className="group relative">
-                                            <ApplicationPill app={app} />
+                                            <ApplicationPill app={app} onEdit={() => handleOpenEdit(app)} />
                                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => handleOpenEdit(app)}
-                                                    className="text-gray-400 hover:text-blue-400 text-xs px-2 cursor-pointer"
-                                                >
-                                                    ✎
-                                                </button>
                                                 <button
                                                     onClick={() => handleDeleteApplication(app._id)}
                                                     className="text-gray-400 hover:text-red-400 text-xs px-2 cursor-pointer"
