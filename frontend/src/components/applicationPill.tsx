@@ -9,7 +9,7 @@ const STATUS_COLORS: Record<string, string> = {
     rejected: 'text-red-500',
     interview: 'text-blue-400',
     offer: 'text-green-500',
-    ghosted: 'text-muave-500',
+    ghosted: 'text-mauve-400',
     applied: 'text-gray-400',
     saved: 'text-slate-500',
 };
