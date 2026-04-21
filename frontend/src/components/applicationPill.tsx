@@ -21,7 +21,7 @@ const ApplicationPill = ({ app }: AppProps) => {
         : '—';
 
     return (
-        <div className="grid grid-cols-4 items-center bg-[#8B0000] rounded-full py-3 px-2 border border-slate-500 shadow-md transition-transform hover:scale-[1.01]">
+        <div className="grid grid-cols-4 items-center rounded-full py-3 px-2 border border-slate-500 shadow-md transition-transform hover:scale-[1.01]">
             <div className="text-center font-normal text-xl text-white">{app.companyName}</div>
             <div className="text-center font-normal text-xl text-white">{app.jobTitle}</div>
             <div className={`text-center text-xl ${statusColor}`}>

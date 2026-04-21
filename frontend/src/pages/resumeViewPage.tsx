@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getResume, listApplications, createApplication, deleteApplication } from '../api/client';
+import { getResume, listApplications, createApplication, deleteApplication, uploadResumeVersion } from '../api/client';
 import type { Resume, ResumeVersion, Application } from '../api/client';
 import ApplicationPill from '../components/applicationPill';
 import Navbar from '../components/navBar';
@@ -39,6 +39,11 @@ const ResumeViewPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [form, setForm] = useState(EMPTY_FORM);
     const [submitting, setSubmitting] = useState(false);
+
+    const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
+    const [versionFile, setVersionFile] = useState<File | null>(null);
+    const [versionCommit, setVersionCommit] = useState('');
+    const [uploadingVersion, setUploadingVersion] = useState(false);
 
     useEffect(() => {
         if (!id) return;
@@ -80,6 +85,28 @@ const ResumeViewPage = () => {
             setApplications((prev) => prev.filter((a) => a._id !== appId));
         } catch (err) {
             console.error('Failed to delete application:', err);
+        }
+    };
+
+    const handleUploadVersion = async () => {
+        if (!id || !versionFile || !versionCommit.trim()) return;
+        setUploadingVersion(true);
+        try {
+            const { version } = await uploadResumeVersion(id, versionFile, versionCommit.trim());
+            setVersions((prev) => [...prev, version]);
+            setResume((r) => r ? { ...r, headVersionId: version._id } : r);
+            setIsVersionModalOpen(false);
+            setVersionFile(null);
+            setVersionCommit('');
+            // Reload to get fresh download URL for the new PDF
+            const { resume: refreshed, versions: refreshedVersions, downloadUrl: freshUrl } = await getResume(id);
+            setResume(refreshed);
+            setVersions(refreshedVersions);
+            setDownloadUrl(freshUrl);
+        } catch (err) {
+            console.error('Failed to upload new version:', err);
+        } finally {
+            setUploadingVersion(false);
         }
     };
 
@@ -170,8 +197,14 @@ const ResumeViewPage = () => {
 
                         {/* Version History */}
                         <div className="mt-8">
-                            <div className="bg-[#3a2020] rounded-t-2xl p-4 flex items-center shadow-lg">
+                            <div className="bg-[#3a2020] rounded-t-2xl p-4 flex justify-between items-center shadow-lg">
                                 <h2 className="text-2xl font-normal ml-4">Version History</h2>
+                                <button
+                                    onClick={() => setIsVersionModalOpen(true)}
+                                    className="bg-white text-black px-6 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition-all mr-4 cursor-pointer"
+                                >
+                                    Upload V{versions.length + 1}
+                                </button>
                             </div>
                             <div className="bg-[#232323] rounded-b-2xl p-6 shadow-2xl border-t border-black/20">
                                 {versions.length === 0 ? (
@@ -220,6 +253,49 @@ const ResumeViewPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Upload New Version Modal */}
+            {isVersionModalOpen && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                    <div className="bg-[#232323] p-8 rounded-2xl w-[420px] border border-[#3a2020]">
+                        <h3 className="text-xl mb-6 font-normal">Upload New Version</h3>
+
+                        <div className="flex flex-col gap-3">
+                            <label className="flex flex-col gap-1">
+                                <span className="text-sm text-gray-400">PDF File</span>
+                                <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    onChange={(e) => setVersionFile(e.target.files?.[0] ?? null)}
+                                    className="w-full p-2 bg-white text-black rounded outline-none text-sm cursor-pointer"
+                                />
+                            </label>
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="What changed? (commit message)"
+                                value={versionCommit}
+                                onChange={(e) => setVersionCommit(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex gap-4 mt-6">
+                            <button
+                                onClick={() => { setIsVersionModalOpen(false); setVersionFile(null); setVersionCommit(''); }}
+                                className="flex-1 bg-gray-700 py-2 rounded-lg hover:bg-gray-600 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleUploadVersion}
+                                disabled={uploadingVersion || !versionFile || !versionCommit.trim()}
+                                className="flex-1 bg-[#3a2020] py-2 rounded-lg hover:bg-[#4a2828] cursor-pointer disabled:opacity-50"
+                            >
+                                {uploadingVersion ? 'Uploading…' : 'Upload'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Add Application Modal */}
             {isModalOpen && (

@@ -156,6 +156,26 @@ export const getResumePdfUrl = (id: string): string => `${BASE_URL}/resumes/${id
 export const getResume = (id: string): Promise<{ resume: Resume; versions: ResumeVersion[]; downloadUrl: string }> =>
   apiFetch<{ resume: Resume; versions: ResumeVersion[]; downloadUrl: string }>(`/resumes/${id}`);
 
+export const uploadResumeVersion = async (
+  resumeId: string,
+  file: File,
+  commitMessage: string
+): Promise<{ version: ResumeVersion }> => {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('resume', file);
+  formData.append('commitMessage', commitMessage);
+
+  const res = await fetch(`${BASE_URL}/resumes/${resumeId}/versions/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message ?? 'Upload failed');
+  return data;
+};
+
 export const createResumeVersion = (
   resumeId: string,
   data: { commitMessage: string; extractedText?: string; source: 'ai_edit' | 'manual_edit' }

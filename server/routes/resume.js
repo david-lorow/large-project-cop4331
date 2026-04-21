@@ -343,6 +343,88 @@ router.get('/:id/versions', protect, async (req, res) => {
   }
 });
 
+// POST /api/resumes/:id/versions/upload
+// Upload a new PDF as the next version of an existing resume.
+router.post('/:id/versions/upload', protect, upload.single('resume'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'No PDF file provided.' });
+
+  const { commitMessage } = req.body;
+  if (!commitMessage) return res.status(400).json({ message: 'commitMessage is required.' });
+
+  try {
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!resume) return res.status(404).json({ message: 'Resume not found.' });
+
+    const currentHead = resume.headVersionId
+      ? await ResumeVersion.findById(resume.headVersionId)
+      : null;
+
+    const versionNumber = currentHead ? currentHead.versionNumber + 1 : 1;
+    const s3Key = `resumes/${req.user._id}/${uuidv4()}.pdf`;
+
+    // 1. Upload PDF to S3
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: s3Key,
+      Body: req.file.buffer,
+      ContentType: 'application/pdf',
+    }));
+
+    // 2. Generate thumbnail (non-fatal)
+    let thumbnailS3Key = null;
+    try {
+      const thumbnailBuffer = await generateThumbnail(req.file.buffer);
+      thumbnailS3Key = `thumbnails/${req.user._id}/${uuidv4()}.jpg`;
+      await s3.send(new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: thumbnailS3Key,
+        Body: thumbnailBuffer,
+        ContentType: 'image/jpeg',
+      }));
+    } catch (thumbErr) {
+      console.error('Thumbnail generation error:', thumbErr.message);
+    }
+
+    // 3. Run Textract (non-fatal)
+    let extractedText = '';
+    let keywords = [];
+    try {
+      const textractRes = await textract.send(new DetectDocumentTextCommand({
+        Document: { S3Object: { Bucket: BUCKET, Name: s3Key } },
+      }));
+      extractedText = parseTextractBlocks(textractRes.Blocks || []);
+      keywords = extractKeywords(extractedText);
+    } catch (textractErr) {
+      console.error('Textract error:', textractErr.message);
+    }
+
+    // 4. Create the new version
+    const version = await ResumeVersion.create({
+      resumeId: resume._id,
+      userId: req.user._id,
+      versionNumber,
+      commitMessage,
+      s3Key,
+      originalFileName: req.file.originalname,
+      thumbnailS3Key,
+      extractedText,
+      keywords,
+      parentVersionId: currentHead?._id ?? null,
+      source: 'upload',
+    });
+
+    resume.headVersionId = version._id;
+    await resume.save();
+
+    const thumbnailUrl = await presignThumbnail(thumbnailS3Key);
+
+    return res.status(201).json({ version: { ...version.toObject(), thumbnailUrl } });
+  } catch (err) {
+    console.error('Version upload error:', err);
+    return res.status(500).json({ message: 'Upload failed.' });
+  }
+});
+
 // POST /api/resumes/:id/versions
 // Commit a new version from edited text (ai_edit or manual_edit).
 router.post('/:id/versions', protect, async (req, res) => {
