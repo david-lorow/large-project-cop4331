@@ -16,13 +16,16 @@ router.post('/review', protect, async (req, res) => {
 
   let resume;
   try {
-    resume = await Resume.findOne({ _id: resumeId, userId: req.user._id });
+    resume = await Resume.findOne({ _id: resumeId, userId: req.user._id }).populate('headVersionId');
   } catch {
     return res.status(400).json({ message: 'Invalid resumeId.' });
   }
   if (!resume) return res.status(404).json({ message: 'Resume not found.' });
 
-  const resumeText = resume.extractedText || 'No text extracted from this resume.';
+  const resumeText =
+    resume.headVersionId?.extractedText ||
+    resume.extractedText ||
+    'No text extracted from this resume.';
 
   let systemPrompt, userContent;
 

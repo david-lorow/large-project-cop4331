@@ -20,15 +20,42 @@ export interface RegisterResponse {
   userId: string;
 }
 
+export interface ResumeVersion {
+  _id: string;
+  resumeId: string;
+  versionNumber: number;
+  commitMessage: string;
+  s3Key?: string;
+  originalFileName?: string;
+  thumbnailS3Key?: string;
+  thumbnailUrl?: string;
+  keywords: string[];
+  parentVersionId?: string | null;
+  source: 'upload' | 'ai_edit' | 'manual_edit';
+  createdAt: string;
+}
+
 export interface Resume {
   _id: string;
   title: string;
-  versionName?: string;
-  notes?: string;
-  originalFileName: string;
-  keywords: string[];
+  headVersionId?: string;
+  headVersion?: ResumeVersion;
   createdAt: string;
-  thumbnailUrl?: string; // presigned S3 URL for the page-1 JPEG thumbnail
+  thumbnailUrl?: string; // flattened from headVersion by the API
+}
+
+export interface Application {
+  _id: string;
+  resumeId: string;
+  resumeVersionId?: string;
+  companyName: string;
+  jobTitle: string;
+  status: 'saved' | 'applied' | 'interview' | 'offer' | 'rejected' | 'ghosted';
+  dateApplied?: string;
+  jobLink?: string;
+  location?: string;
+  notes?: string;
+  createdAt: string;
 }
 
 //Token helpers
@@ -126,8 +153,51 @@ export const searchResumes = (q: string): Promise<{ resumes: Resume[] }> =>
 
 export const getResumePdfUrl = (id: string): string => `${BASE_URL}/resumes/${id}/pdf`;
 
-export const getResume = (id: string): Promise<{ resume: Resume; downloadUrl: string }> =>
-  apiFetch<{ resume: Resume; downloadUrl: string }>(`/resumes/${id}`);
+export const getResume = (id: string): Promise<{ resume: Resume; versions: ResumeVersion[]; downloadUrl: string }> =>
+  apiFetch<{ resume: Resume; versions: ResumeVersion[]; downloadUrl: string }>(`/resumes/${id}`);
+
+export const createResumeVersion = (
+  resumeId: string,
+  data: { commitMessage: string; extractedText?: string; source: 'ai_edit' | 'manual_edit' }
+): Promise<{ version: ResumeVersion }> =>
+  apiFetch<{ version: ResumeVersion }>(`/resumes/${resumeId}/versions`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+//Application endpoints
+
+export const listApplications = (resumeId?: string): Promise<{ applications: Application[] }> =>
+  apiFetch<{ applications: Application[] }>(
+    `/applications${resumeId ? `?resumeId=${encodeURIComponent(resumeId)}` : ''}`
+  );
+
+export const createApplication = (data: {
+  resumeId: string;
+  companyName: string;
+  jobTitle: string;
+  status?: string;
+  jobLink?: string;
+  location?: string;
+  notes?: string;
+  dateApplied?: string;
+}): Promise<{ application: Application }> =>
+  apiFetch<{ application: Application }>('/applications', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateApplication = (
+  id: string,
+  updates: Partial<Pick<Application, 'companyName' | 'jobTitle' | 'status' | 'jobLink' | 'location' | 'notes' | 'dateApplied'>>
+): Promise<{ application: Application }> =>
+  apiFetch<{ application: Application }>(`/applications/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+
+export const deleteApplication = (id: string): Promise<{ message: string }> =>
+  apiFetch<{ message: string }>(`/applications/${id}`, { method: 'DELETE' });
 
 //AI review endpoint — streams plain text chunks via onChunk callback
 export interface ReviewParams {

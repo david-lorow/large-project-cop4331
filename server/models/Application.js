@@ -15,6 +15,12 @@ const applicationSchema = new mongoose.Schema(
       required: true,
     },
 
+    resumeVersionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ResumeVersion',
+      default: null,
+    },
+
     //Application Details
     companyName: {
       type: String,

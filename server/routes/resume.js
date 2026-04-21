@@ -1,14 +1,14 @@
 const express = require('express');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-const { PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { DetectDocumentTextCommand } = require('@aws-sdk/client-textract');
 
 const { s3, textract } = require('../config/s3');
 const { protect } = require('../middleware/authMiddleware');
 const Resume = require('../models/Resume');
+const ResumeVersion = require('../models/ResumeVersion');
 const { generateThumbnail } = require('../services/thumbnail');
 
 const router = express.Router();
@@ -71,7 +71,7 @@ function extractKeywords(text) {
   const lower = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
   const words = lower.split(/\s+/).filter((w) => w.length > 2);
 
-  // Pass 1: frequency-based general keywords (existing behavior)
+  // Pass 1: frequency-based general keywords
   const freq = {};
   words
     .filter((w) => !STOP_WORDS.has(w))
@@ -82,13 +82,12 @@ function extractKeywords(text) {
     .slice(0, 20)
     .map(([word]) => word);
 
-  // Pass 2: explicit job title matches (preserves original casing from source text)
+  // Pass 2: explicit job title matches
   const titleKeywords = [];
   const sourceWords = text.split(/\s+/);
   for (let i = 0; i < sourceWords.length; i++) {
     const clean = sourceWords[i].toLowerCase().replace(/[^a-z]/g, '');
     if (JOB_TITLES.has(clean) && !titleKeywords.includes(sourceWords[i])) {
-      // Also grab the preceding word if it's a seniority qualifier
       const prev = i > 0 ? sourceWords[i - 1].toLowerCase().replace(/[^a-z]/g, '') : '';
       if (prev && JOB_TITLES.has(prev)) {
         const combined = `${sourceWords[i - 1]} ${sourceWords[i]}`;
@@ -99,7 +98,6 @@ function extractKeywords(text) {
     }
   }
 
-  // Merge: title keywords first (higher signal), then frequency keywords, deduped
   const seen = new Set();
   const merged = [...titleKeywords, ...frequencyKeywords].filter((w) => {
     const key = w.toLowerCase();
@@ -111,88 +109,92 @@ function extractKeywords(text) {
   return merged.slice(0, 30);
 }
 
+async function presignThumbnail(thumbnailS3Key) {
+  if (!thumbnailS3Key) return null;
+  return getSignedUrl(
+    s3,
+    new GetObjectCommand({ Bucket: BUCKET, Key: thumbnailS3Key }),
+    { expiresIn: 60 * 15 }
+  );
+}
+
 // POST /api/resumes/upload
-// Accepts a PDF, stores in S3, runs Textract, saves metadata to MongoDB.
 router.post('/upload', protect, upload.single('resume'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No PDF file provided.' });
-  }
+  if (!req.file) return res.status(400).json({ message: 'No PDF file provided.' });
 
-  const { title, versionName, notes } = req.body;
-  if (!title) {
-    return res.status(400).json({ message: 'title is required.' });
-  }
+  const { title, commitMessage } = req.body;
+  if (!title) return res.status(400).json({ message: 'title is required.' });
 
-  const ext = '.pdf';
-  const s3Key = `resumes/${req.user._id}/${uuidv4()}${ext}`;
+  const s3Key = `resumes/${req.user._id}/${uuidv4()}.pdf`;
 
   try {
-    // 1. Upload to S3
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: s3Key,
-        Body: req.file.buffer,
-        ContentType: 'application/pdf',
-      })
-    );
+    // 1. Upload PDF to S3
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: s3Key,
+      Body: req.file.buffer,
+      ContentType: 'application/pdf',
+    }));
 
     // 2. Generate thumbnail (non-fatal)
     let thumbnailS3Key = null;
     try {
       const thumbnailBuffer = await generateThumbnail(req.file.buffer);
       thumbnailS3Key = `thumbnails/${req.user._id}/${uuidv4()}.jpg`;
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: BUCKET,
-          Key: thumbnailS3Key,
-          Body: thumbnailBuffer,
-          ContentType: 'image/jpeg',
-        })
-      );
+      await s3.send(new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: thumbnailS3Key,
+        Body: thumbnailBuffer,
+        ContentType: 'image/jpeg',
+      }));
     } catch (thumbErr) {
       console.error('Thumbnail generation error:', thumbErr.message);
     }
 
-    // 3. Run Textract (synchronous — fine for single-page resumes)
+    // 3. Run Textract (non-fatal)
     let extractedText = '';
     let keywords = [];
     try {
-      const textractRes = await textract.send(
-        new DetectDocumentTextCommand({
-          Document: { S3Object: { Bucket: BUCKET, Name: s3Key } },
-        })
-      );
+      const textractRes = await textract.send(new DetectDocumentTextCommand({
+        Document: { S3Object: { Bucket: BUCKET, Name: s3Key } },
+      }));
       extractedText = parseTextractBlocks(textractRes.Blocks || []);
       keywords = extractKeywords(extractedText);
     } catch (textractErr) {
-      // Non-fatal: store the resume without text extraction
       console.error('Textract error:', textractErr.message);
     }
 
-    // 4. Persist metadata to MongoDB
-    const resume = await Resume.create({
+    // 4. Create the Resume repo
+    const resume = await Resume.create({ userId: req.user._id, title });
+
+    // 5. Create ResumeVersion v1 — the first commit
+    const version = await ResumeVersion.create({
+      resumeId: resume._id,
       userId: req.user._id,
-      title,
-      versionName: versionName || undefined,
-      notes: notes || undefined,
+      versionNumber: 1,
+      commitMessage: commitMessage || 'Initial upload',
       s3Key,
       originalFileName: req.file.originalname,
+      thumbnailS3Key,
       extractedText,
       keywords,
-      thumbnailS3Key,
+      parentVersionId: null,
+      source: 'upload',
     });
 
-    let thumbnailUrl = null;
-    if (thumbnailS3Key) {
-      thumbnailUrl = await getSignedUrl(
-        s3,
-        new GetObjectCommand({ Bucket: BUCKET, Key: thumbnailS3Key }),
-        { expiresIn: 60 * 15 }
-      );
-    }
+    // 6. Point headVersionId at the new version
+    resume.headVersionId = version._id;
+    await resume.save();
 
-    return res.status(201).json({ resume: { ...resume.toObject(), thumbnailUrl } });
+    const thumbnailUrl = await presignThumbnail(thumbnailS3Key);
+
+    return res.status(201).json({
+      resume: {
+        ...resume.toObject(),
+        headVersion: { ...version.toObject(), thumbnailUrl },
+        thumbnailUrl,
+      },
+    });
   } catch (err) {
     console.error('Resume upload error:', err);
     return res.status(500).json({ message: 'Upload failed.' });
@@ -200,28 +202,26 @@ router.post('/upload', protect, upload.single('resume'), async (req, res) => {
 });
 
 // GET /api/resumes
-// List all resumes for the authenticated user (no extracted text in list response).
 router.get('/', protect, async (req, res) => {
   try {
     const resumes = await Resume.find({ userId: req.user._id })
-      .select('-extractedText')
-      .sort({ createdAt: -1 });
+      .populate({ path: 'headVersionId', select: '-extractedText' })
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const resumesWithThumbnails = await Promise.all(
+    const result = await Promise.all(
       resumes.map(async (r) => {
-        const obj = r.toObject();
-        if (r.thumbnailS3Key) {
-          obj.thumbnailUrl = await getSignedUrl(
-            s3,
-            new GetObjectCommand({ Bucket: BUCKET, Key: r.thumbnailS3Key }),
-            { expiresIn: 60 * 15 }
-          );
-        }
-        return obj;
+        const hv = r.headVersionId;
+        const thumbnailUrl = hv ? await presignThumbnail(hv.thumbnailS3Key) : null;
+        return {
+          ...r,
+          headVersion: hv ? { ...hv, thumbnailUrl } : null,
+          thumbnailUrl,
+        };
       })
     );
 
-    return res.json({ resumes: resumesWithThumbnails });
+    return res.json({ resumes: result });
   } catch (err) {
     console.error('Resume list error:', err);
     return res.status(500).json({ message: 'Failed to fetch resumes.' });
@@ -229,55 +229,44 @@ router.get('/', protect, async (req, res) => {
 });
 
 // GET /api/resumes/search?q=<query>
-// Keyword search across the authenticated user's resumes, ranked by match score.
 router.get('/search', protect, async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.json({ resumes: [] });
 
-  const queryWords = [...new Set(
-    q.toLowerCase().split(/\s+/).filter((w) => w.length > 1),
-  )];
-
-  // Prefix-match regexes so "pr" matches "president", "programming", etc.
-  const keywordRegexes = queryWords.map((w) => new RegExp(`^${w}`, 'i'));
+  const queryWords = [...new Set(q.toLowerCase().split(/\s+/).filter((w) => w.length > 1))];
 
   try {
-    const resumes = await Resume.find({
-      userId: req.user._id,
-      $or: [
-        { keywords: { $in: keywordRegexes } },
-        { title: { $regex: queryWords.join('|'), $options: 'i' } },
-      ],
-    })
-      .select('-extractedText')
+    const resumes = await Resume.find({ userId: req.user._id })
+      .populate({ path: 'headVersionId', select: '-extractedText' })
       .lean();
 
-    // Score by number of query words that prefix-match any keyword
     const scored = resumes
       .map((r) => {
-        const kws = (r.keywords || []).map((k) => k.toLowerCase());
-        const score = queryWords.reduce(
+        const hv = r.headVersionId;
+        const kws = (hv?.keywords || []).map((k) => k.toLowerCase());
+        const titleMatch = queryWords.some((w) => r.title.toLowerCase().includes(w));
+        const kwScore = queryWords.reduce(
           (acc, w) => acc + (kws.some((k) => k.startsWith(w)) ? 1 : 0),
-          0,
+          0
         );
-        return { r, score };
+        return { r, score: kwScore + (titleMatch ? 1 : 0) };
       })
+      .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
 
-    const resumesWithThumbnails = await Promise.all(
+    const result = await Promise.all(
       scored.map(async ({ r }) => {
-        if (r.thumbnailS3Key) {
-          r.thumbnailUrl = await getSignedUrl(
-            s3,
-            new GetObjectCommand({ Bucket: BUCKET, Key: r.thumbnailS3Key }),
-            { expiresIn: 60 * 15 },
-          );
-        }
-        return r;
-      }),
+        const hv = r.headVersionId;
+        const thumbnailUrl = hv ? await presignThumbnail(hv.thumbnailS3Key) : null;
+        return {
+          ...r,
+          headVersion: hv ? { ...hv, thumbnailUrl } : null,
+          thumbnailUrl,
+        };
+      })
     );
 
-    return res.json({ resumes: resumesWithThumbnails });
+    return res.json({ resumes: result });
   } catch (err) {
     console.error('Resume search error:', err);
     return res.status(500).json({ message: 'Search failed.' });
@@ -285,19 +274,30 @@ router.get('/search', protect, async (req, res) => {
 });
 
 // GET /api/resumes/:id
-// Get a single resume with a short-lived presigned S3 download URL.
 router.get('/:id', protect, async (req, res) => {
   try {
-    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id })
+      .populate('headVersionId')
+      .lean();
     if (!resume) return res.status(404).json({ message: 'Resume not found.' });
 
-    const downloadUrl = await getSignedUrl(
-      s3,
-      new GetObjectCommand({ Bucket: BUCKET, Key: resume.s3Key }),
-      { expiresIn: 60 * 15 } // 15-minute window
-    );
+    const hv = resume.headVersionId;
+    if (!hv?.s3Key) return res.status(404).json({ message: 'No PDF available for this resume.' });
 
-    return res.json({ resume, downloadUrl });
+    const [downloadUrl, thumbnailUrl, versions] = await Promise.all([
+      getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: hv.s3Key }), { expiresIn: 60 * 15 }),
+      presignThumbnail(hv.thumbnailS3Key),
+      ResumeVersion.find({ resumeId: resume._id })
+        .select('-extractedText')
+        .sort({ versionNumber: 1 })
+        .lean(),
+    ]);
+
+    return res.json({
+      resume: { ...resume, headVersion: { ...hv, thumbnailUrl }, thumbnailUrl },
+      versions,
+      downloadUrl,
+    });
   } catch (err) {
     console.error('Resume fetch error:', err);
     return res.status(500).json({ message: 'Failed to fetch resume.' });
@@ -305,18 +305,19 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // GET /api/resumes/:id/pdf
-// Proxy the PDF through the server so the browser avoids S3 CORS restrictions.
+// Proxy the PDF through the server (CORS workaround).
 router.get('/:id/pdf', protect, async (req, res) => {
   try {
-    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id })
+      .populate('headVersionId');
     if (!resume) return res.status(404).json({ message: 'Resume not found.' });
 
-    const s3Response = await s3.send(
-      new GetObjectCommand({ Bucket: BUCKET, Key: resume.s3Key })
-    );
+    const hv = resume.headVersionId;
+    if (!hv?.s3Key) return res.status(404).json({ message: 'No PDF available.' });
 
+    const s3Response = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: hv.s3Key }));
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${resume.originalFileName}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${hv.originalFileName || 'resume.pdf'}"`);
     s3Response.Body.pipe(res);
   } catch (err) {
     console.error('PDF proxy error:', err);
@@ -324,17 +325,92 @@ router.get('/:id/pdf', protect, async (req, res) => {
   }
 });
 
+// GET /api/resumes/:id/versions
+router.get('/:id/versions', protect, async (req, res) => {
+  try {
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!resume) return res.status(404).json({ message: 'Resume not found.' });
+
+    const versions = await ResumeVersion.find({ resumeId: resume._id })
+      .select('-extractedText')
+      .sort({ versionNumber: 1 })
+      .lean();
+
+    return res.json({ versions });
+  } catch (err) {
+    console.error('Versions fetch error:', err);
+    return res.status(500).json({ message: 'Failed to fetch versions.' });
+  }
+});
+
+// POST /api/resumes/:id/versions
+// Commit a new version from edited text (ai_edit or manual_edit).
+router.post('/:id/versions', protect, async (req, res) => {
+  const { commitMessage, extractedText, source } = req.body;
+  if (!commitMessage) return res.status(400).json({ message: 'commitMessage is required.' });
+  if (!['ai_edit', 'manual_edit'].includes(source)) {
+    return res.status(400).json({ message: 'source must be "ai_edit" or "manual_edit".' });
+  }
+
+  try {
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!resume) return res.status(404).json({ message: 'Resume not found.' });
+
+    const currentHead = resume.headVersionId
+      ? await ResumeVersion.findById(resume.headVersionId)
+      : null;
+
+    const versionNumber = currentHead ? currentHead.versionNumber + 1 : 1;
+    const newKeywords = extractedText
+      ? extractKeywords(extractedText)
+      : (currentHead?.keywords || []);
+
+    const version = await ResumeVersion.create({
+      resumeId: resume._id,
+      userId: req.user._id,
+      versionNumber,
+      commitMessage,
+      // Inherit the parent's PDF and thumbnail — only the text changed
+      s3Key: currentHead?.s3Key,
+      originalFileName: currentHead?.originalFileName,
+      thumbnailS3Key: currentHead?.thumbnailS3Key,
+      extractedText: extractedText ?? currentHead?.extractedText ?? '',
+      keywords: newKeywords,
+      parentVersionId: currentHead?._id ?? null,
+      source,
+    });
+
+    resume.headVersionId = version._id;
+    await resume.save();
+
+    return res.status(201).json({ version });
+  } catch (err) {
+    console.error('Version create error:', err);
+    return res.status(500).json({ message: 'Failed to create version.' });
+  }
+});
+
 // DELETE /api/resumes/:id
-// Remove from S3 and MongoDB.
 router.delete('/:id', protect, async (req, res) => {
   try {
     const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
     if (!resume) return res.status(404).json({ message: 'Resume not found.' });
 
-    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: resume.s3Key }));
-    if (resume.thumbnailS3Key) {
-      await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: resume.thumbnailS3Key }));
+    // Collect all unique S3 keys across all versions
+    const versions = await ResumeVersion.find({ resumeId: resume._id });
+    const s3Keys = new Set();
+    for (const v of versions) {
+      if (v.s3Key) s3Keys.add(v.s3Key);
+      if (v.thumbnailS3Key) s3Keys.add(v.thumbnailS3Key);
     }
+
+    await Promise.all(
+      [...s3Keys].map((key) =>
+        s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key })).catch(() => {})
+      )
+    );
+
+    await ResumeVersion.deleteMany({ resumeId: resume._id });
     await resume.deleteOne();
 
     return res.json({ message: 'Resume deleted.' });

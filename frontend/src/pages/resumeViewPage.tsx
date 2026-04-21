@@ -1,29 +1,53 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getResume } from '../api/client';
-import type { Resume } from '../api/client';
+import { getResume, listApplications, createApplication, deleteApplication } from '../api/client';
+import type { Resume, ResumeVersion, Application } from '../api/client';
 import ApplicationPill from '../components/applicationPill';
 import Navbar from '../components/navBar';
+
+const SOURCE_LABELS: Record<ResumeVersion['source'], string> = {
+    upload: 'upload',
+    ai_edit: 'AI edit',
+    manual_edit: 'manual edit',
+};
+
+const SOURCE_COLORS: Record<ResumeVersion['source'], string> = {
+    upload: 'bg-blue-900/50 text-blue-300',
+    ai_edit: 'bg-purple-900/50 text-purple-300',
+    manual_edit: 'bg-green-900/50 text-green-300',
+};
+
+const EMPTY_FORM = {
+    companyName: '',
+    jobTitle: '',
+    status: 'applied' as Application['status'],
+    dateApplied: '',
+    jobLink: '',
+    location: '',
+};
 
 const ResumeViewPage = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+
     const [resume, setResume] = useState<Resume | null>(null);
     const [downloadUrl, setDownloadUrl] = useState<string>('');
+    const [versions, setVersions] = useState<ResumeVersion[]>([]);
+    const [applications, setApplications] = useState<Application[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Mock applications — wiring to real API is a future task
-    const [applications, _setApplications] = useState([
-        { id: 1, company: 'Lockheed', position: 'Software Engineer', status: 'Ghosted', date: '04/06/2026' }
-    ]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [form, setForm] = useState(EMPTY_FORM);
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         if (!id) return;
-        getResume(id)
-            .then(({ resume, downloadUrl }) => {
+        Promise.all([getResume(id), listApplications(id)])
+            .then(([{ resume, versions, downloadUrl }, { applications }]) => {
                 setResume(resume);
                 setDownloadUrl(downloadUrl);
+                setVersions(versions);
+                setApplications(applications);
             })
             .catch(console.error)
             .finally(() => setLoading(false));
@@ -34,6 +58,32 @@ const ResumeViewPage = () => {
         const w = window.open(downloadUrl, '_blank');
         if (w) w.addEventListener('load', () => w.print());
     };
+
+    const handleAddApplication = async () => {
+        if (!id || !form.companyName.trim() || !form.jobTitle.trim()) return;
+        setSubmitting(true);
+        try {
+            const { application } = await createApplication({ ...form, resumeId: id });
+            setApplications((prev) => [application, ...prev]);
+            setIsModalOpen(false);
+            setForm(EMPTY_FORM);
+        } catch (err) {
+            console.error('Failed to create application:', err);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDeleteApplication = async (appId: string) => {
+        try {
+            await deleteApplication(appId);
+            setApplications((prev) => prev.filter((a) => a._id !== appId));
+        } catch (err) {
+            console.error('Failed to delete application:', err);
+        }
+    };
+
+    const headVersionId = resume?.headVersionId;
 
     return (
         <div className="flex flex-col h-screen bg-[#1a1a1a] text-white overflow-hidden">
@@ -70,17 +120,28 @@ const ResumeViewPage = () => {
                     </div>
                 </div>
 
-                {/* Right: Applications */}
+                {/* Right: Applications + Version History */}
                 <div className="w-7/12 p-8 overflow-y-auto bg-[#1a1a1a]">
                     <div className="max-w-3xl mx-auto">
-                        <button onClick={() => navigate('/home')} className="mt-1 mb-12 text-3xl hover:text-gray-400 transition-colors cursor-pointer flex items-center">←</button>
+                        <button
+                            onClick={() => navigate('/home')}
+                            className="mt-1 mb-12 text-3xl hover:text-gray-400 transition-colors cursor-pointer flex items-center"
+                        >
+                            ←
+                        </button>
 
+                        {/* Applications */}
                         <div className="bg-[#8B0000] rounded-t-2xl p-4 flex justify-between items-center shadow-lg">
                             <h2 className="text-3xl font-normal ml-4">Applications</h2>
-                            <button onClick={() => setIsModalOpen(true)} className="bg-white text-black px-6 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition-all mr-4 cursor-pointer">Add</button>
+                            <button
+                                onClick={() => setIsModalOpen(true)}
+                                className="bg-white text-black px-6 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition-all mr-4 cursor-pointer"
+                            >
+                                Add
+                            </button>
                         </div>
 
-                        <div className="bg-[#232323] rounded-b-2xl p-6 min-h-[400px] shadow-2xl border-t border-black/20">
+                        <div className="bg-[#232323] rounded-b-2xl p-6 min-h-[200px] shadow-2xl border-t border-black/20">
                             <div className="grid grid-cols-4 text-center text-sm mb-4 text-gray-300 font-light tracking-wide">
                                 <div>Company</div>
                                 <div>Position</div>
@@ -89,29 +150,142 @@ const ResumeViewPage = () => {
                             </div>
 
                             <div className="flex flex-col gap-3">
-                                {applications.map((app) => (
-                                    <ApplicationPill key={app.id} app={app} />
-                                ))}
+                                {applications.length === 0 ? (
+                                    <p className="text-center text-gray-600 text-sm py-8">No applications yet</p>
+                                ) : (
+                                    applications.map((app) => (
+                                        <div key={app._id} className="group relative">
+                                            <ApplicationPill app={app} />
+                                            <button
+                                                onClick={() => handleDeleteApplication(app._id)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-400 text-xs px-2 cursor-pointer"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Version History */}
+                        <div className="mt-8">
+                            <div className="bg-[#3a2020] rounded-t-2xl p-4 flex items-center shadow-lg">
+                                <h2 className="text-2xl font-normal ml-4">Version History</h2>
+                            </div>
+                            <div className="bg-[#232323] rounded-b-2xl p-6 shadow-2xl border-t border-black/20">
+                                {versions.length === 0 ? (
+                                    <p className="text-center text-gray-600 text-sm py-8">No versions yet</p>
+                                ) : (
+                                    <div className="flex flex-col gap-1">
+                                        {[...versions].reverse().map((v, idx) => {
+                                            const isHead = headVersionId === v._id;
+                                            return (
+                                                <div key={v._id}>
+                                                    <div className={`flex items-center gap-4 p-3 rounded-xl ${isHead ? 'bg-[#2e1f1f] border border-[#8B0000]/40' : 'bg-[#1e1e1e]'}`}>
+                                                        {/* Version badge */}
+                                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-mono font-bold shrink-0 ${isHead ? 'bg-[#8B0000] text-white' : 'bg-[#333] text-gray-400'}`}>
+                                                            v{v.versionNumber}
+                                                        </div>
+
+                                                        {/* Commit message + meta */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-white truncate">{v.commitMessage}</p>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${SOURCE_COLORS[v.source]}`}>
+                                                                    {SOURCE_LABELS[v.source]}
+                                                                </span>
+                                                                <span className="text-xs text-gray-500">
+                                                                    {new Date(v.createdAt).toLocaleDateString()}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {isHead && (
+                                                            <span className="text-xs text-[#8B0000] font-semibold shrink-0">HEAD</span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Connector line between versions */}
+                                                    {idx < versions.length - 1 && (
+                                                        <div className="ml-[22px] w-0.5 h-3 bg-gray-700" />
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            {/* Add Application Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-                    <div className="bg-[#232323] p-8 rounded-2xl w-[380px] border border-[#8B0000]">
+                    <div className="bg-[#232323] p-8 rounded-2xl w-[420px] border border-[#8B0000]">
                         <h3 className="text-xl mb-6 font-normal">New Application</h3>
-                        <input className="w-full p-2 mb-4 bg-white text-black rounded outline-none" placeholder="Company" />
-                        <select className="w-full p-2 mb-6 bg-white text-black rounded outline-none">
-                            <option>Purgatory</option>
-                            <option>Interview</option>
-                            <option>Denied</option>
-                            <option>Ghosted</option>
-                        </select>
-                        <div className="flex gap-4">
-                            <button onClick={() => setIsModalOpen(false)} className="flex-1 bg-gray-700 py-2 rounded-lg hover:bg-gray-600 cursor-pointer">Cancel</button>
-                            <button onClick={() => setIsModalOpen(false)} className="flex-1 bg-[#8B0000] py-2 rounded-lg hover:bg-red-700 cursor-pointer">Add</button>
+
+                        <div className="flex flex-col gap-3">
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="Company *"
+                                value={form.companyName}
+                                onChange={(e) => setForm((f) => ({ ...f, companyName: e.target.value }))}
+                            />
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="Job Title *"
+                                value={form.jobTitle}
+                                onChange={(e) => setForm((f) => ({ ...f, jobTitle: e.target.value }))}
+                            />
+                            <select
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                value={form.status}
+                                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as Application['status'] }))}
+                            >
+                                <option value="saved">Saved</option>
+                                <option value="applied">Applied</option>
+                                <option value="interview">Interview</option>
+                                <option value="offer">Offer</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="ghosted">Ghosted</option>
+                            </select>
+                            <input
+                                type="date"
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                value={form.dateApplied}
+                                onChange={(e) => setForm((f) => ({ ...f, dateApplied: e.target.value }))}
+                            />
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="Job Link (optional)"
+                                value={form.jobLink}
+                                onChange={(e) => setForm((f) => ({ ...f, jobLink: e.target.value }))}
+                            />
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="Location (optional)"
+                                value={form.location}
+                                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                            />
+                        </div>
+
+                        <div className="flex gap-4 mt-6">
+                            <button
+                                onClick={() => { setIsModalOpen(false); setForm(EMPTY_FORM); }}
+                                className="flex-1 bg-gray-700 py-2 rounded-lg hover:bg-gray-600 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleAddApplication}
+                                disabled={submitting || !form.companyName.trim() || !form.jobTitle.trim()}
+                                className="flex-1 bg-[#8B0000] py-2 rounded-lg hover:bg-red-800 cursor-pointer disabled:opacity-50"
+                            >
+                                {submitting ? 'Adding…' : 'Add'}
+                            </button>
                         </div>
                     </div>
                 </div>
