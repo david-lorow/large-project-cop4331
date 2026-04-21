@@ -233,7 +233,7 @@ router.get('/search', protect, async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.json({ resumes: [] });
 
-  const queryWords = [...new Set(q.toLowerCase().split(/\s+/).filter((w) => w.length > 1))];
+  const queryWords = [...new Set(q.toLowerCase().split(/\s+/).filter((w) => w.length > 0))];
 
   try {
     const resumes = await Resume.find({ userId: req.user._id })
