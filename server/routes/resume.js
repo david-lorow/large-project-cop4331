@@ -325,6 +325,30 @@ router.get('/:id/pdf', protect, async (req, res) => {
   }
 });
 
+// GET /api/resumes/:id/versions/:versionId/download
+// Returns a presigned S3 URL for a specific resume version's PDF.
+router.get('/:id/versions/:versionId/download', protect, async (req, res) => {
+  try {
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!resume) return res.status(404).json({ message: 'Resume not found.' });
+
+    const version = await ResumeVersion.findOne({ _id: req.params.versionId, resumeId: resume._id });
+    if (!version) return res.status(404).json({ message: 'Version not found.' });
+    if (!version.s3Key) return res.status(404).json({ message: 'No PDF for this version.' });
+
+    const downloadUrl = await getSignedUrl(
+      s3,
+      new GetObjectCommand({ Bucket: BUCKET, Key: version.s3Key }),
+      { expiresIn: 60 * 15 }
+    );
+
+    return res.json({ downloadUrl });
+  } catch (err) {
+    console.error('Version download error:', err);
+    return res.status(500).json({ message: 'Failed to get download URL.' });
+  }
+});
+
 // GET /api/resumes/:id/versions
 router.get('/:id/versions', protect, async (req, res) => {
   try {

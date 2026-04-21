@@ -2,6 +2,7 @@ const express = require('express');
 const { protect } = require('../middleware/authMiddleware');
 const Application = require('../models/Application');
 const Resume = require('../models/Resume');
+const ResumeVersion = require('../models/ResumeVersion');
 
 const router = express.Router();
 
@@ -10,6 +11,7 @@ router.get('/', protect, async (req, res) => {
   try {
     const filter = { userId: req.user._id };
     if (req.query.resumeId) filter.resumeId = req.query.resumeId;
+    if (req.query.resumeVersionId) filter.resumeVersionId = req.query.resumeVersionId;
 
     const applications = await Application.find(filter)
       .populate('resumeVersionId', 'versionNumber commitMessage')
@@ -24,9 +26,8 @@ router.get('/', protect, async (req, res) => {
 });
 
 // POST /api/applications
-// Automatically snapshots the resume's current headVersionId at the moment of creation.
 router.post('/', protect, async (req, res) => {
-  const { resumeId, companyName, jobTitle, status, jobLink, location, notes, dateApplied } = req.body;
+  const { resumeId, resumeVersionId, companyName, jobTitle, status, jobLink, location, notes, dateApplied } = req.body;
   if (!resumeId || !companyName || !jobTitle) {
     return res.status(400).json({ message: 'resumeId, companyName, and jobTitle are required.' });
   }
@@ -35,10 +36,18 @@ router.post('/', protect, async (req, res) => {
     const resume = await Resume.findOne({ _id: resumeId, userId: req.user._id });
     if (!resume) return res.status(404).json({ message: 'Resume not found.' });
 
+    // Use caller-specified version if provided and valid, otherwise fall back to head.
+    let versionId = resume.headVersionId || undefined;
+    if (resumeVersionId) {
+      const version = await ResumeVersion.findOne({ _id: resumeVersionId, resumeId });
+      if (!version) return res.status(404).json({ message: 'Resume version not found.' });
+      versionId = version._id;
+    }
+
     const application = await Application.create({
       userId: req.user._id,
       resumeId,
-      resumeVersionId: resume.headVersionId || undefined,
+      resumeVersionId: versionId,
       companyName,
       jobTitle,
       status: status || 'applied',

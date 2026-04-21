@@ -156,6 +156,9 @@ export const getResumePdfUrl = (id: string): string => `${BASE_URL}/resumes/${id
 export const getResume = (id: string): Promise<{ resume: Resume; versions: ResumeVersion[]; downloadUrl: string }> =>
   apiFetch<{ resume: Resume; versions: ResumeVersion[]; downloadUrl: string }>(`/resumes/${id}`);
 
+export const getVersionDownloadUrl = (resumeId: string, versionId: string): Promise<{ downloadUrl: string }> =>
+  apiFetch<{ downloadUrl: string }>(`/resumes/${resumeId}/versions/${versionId}/download`);
+
 export const uploadResumeVersion = async (
   resumeId: string,
   file: File,
@@ -187,13 +190,17 @@ export const createResumeVersion = (
 
 //Application endpoints
 
-export const listApplications = (resumeId?: string): Promise<{ applications: Application[] }> =>
-  apiFetch<{ applications: Application[] }>(
-    `/applications${resumeId ? `?resumeId=${encodeURIComponent(resumeId)}` : ''}`
-  );
+export const listApplications = (resumeId?: string, resumeVersionId?: string): Promise<{ applications: Application[] }> => {
+  const params = new URLSearchParams();
+  if (resumeId) params.set('resumeId', resumeId);
+  if (resumeVersionId) params.set('resumeVersionId', resumeVersionId);
+  const qs = params.toString();
+  return apiFetch<{ applications: Application[] }>(`/applications${qs ? `?${qs}` : ''}`);
+};
 
 export const createApplication = (data: {
   resumeId: string;
+  resumeVersionId?: string;
   companyName: string;
   jobTitle: string;
   status?: string;

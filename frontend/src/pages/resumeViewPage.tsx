@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getResume, listApplications, createApplication, deleteApplication, uploadResumeVersion } from '../api/client';
+import { getResume, getVersionDownloadUrl, listApplications, createApplication, deleteApplication, uploadResumeVersion } from '../api/client';
 import type { Resume, ResumeVersion, Application } from '../api/client';
 import ApplicationPill from '../components/applicationPill';
 import Navbar from '../components/navBar';
@@ -34,6 +34,7 @@ const ResumeViewPage = () => {
     const [downloadUrl, setDownloadUrl] = useState<string>('');
     const [versions, setVersions] = useState<ResumeVersion[]>([]);
     const [applications, setApplications] = useState<Application[]>([]);
+    const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,16 +48,34 @@ const ResumeViewPage = () => {
 
     useEffect(() => {
         if (!id) return;
-        Promise.all([getResume(id), listApplications(id)])
-            .then(([{ resume, versions, downloadUrl }, { applications }]) => {
+        getResume(id)
+            .then(({ resume, versions, downloadUrl }) => {
                 setResume(resume);
                 setDownloadUrl(downloadUrl);
                 setVersions(versions);
-                setApplications(applications);
+                const headId = resume.headVersionId ?? null;
+                setSelectedVersionId(headId);
+                return listApplications(id, headId ?? undefined);
             })
+            .then(({ applications }) => setApplications(applications))
             .catch(console.error)
             .finally(() => setLoading(false));
     }, [id]);
+
+    const handleSelectVersion = async (version: ResumeVersion) => {
+        if (version._id === selectedVersionId) return;
+        setSelectedVersionId(version._id);
+        try {
+            const [{ downloadUrl }, { applications }] = await Promise.all([
+                getVersionDownloadUrl(id!, version._id),
+                listApplications(id!, version._id),
+            ]);
+            setDownloadUrl(downloadUrl);
+            setApplications(applications);
+        } catch (err) {
+            console.error('Failed to switch version:', err);
+        }
+    };
 
     const handlePrint = () => {
         if (!downloadUrl) return;
@@ -68,7 +87,7 @@ const ResumeViewPage = () => {
         if (!id || !form.companyName.trim() || !form.jobTitle.trim()) return;
         setSubmitting(true);
         try {
-            const { application } = await createApplication({ ...form, resumeId: id });
+            const { application } = await createApplication({ ...form, resumeId: id, resumeVersionId: selectedVersionId ?? undefined });
             setApplications((prev) => [application, ...prev]);
             setIsModalOpen(false);
             setForm(EMPTY_FORM);
@@ -93,16 +112,17 @@ const ResumeViewPage = () => {
         setUploadingVersion(true);
         try {
             const { version } = await uploadResumeVersion(id, versionFile, versionCommit.trim());
-            setVersions((prev) => [...prev, version]);
-            setResume((r) => r ? { ...r, headVersionId: version._id } : r);
             setIsVersionModalOpen(false);
             setVersionFile(null);
             setVersionCommit('');
-            // Reload to get fresh download URL for the new PDF
+            // Reload resume and switch to the new version
             const { resume: refreshed, versions: refreshedVersions, downloadUrl: freshUrl } = await getResume(id);
             setResume(refreshed);
             setVersions(refreshedVersions);
             setDownloadUrl(freshUrl);
+            setSelectedVersionId(version._id);
+            const { applications } = await listApplications(id, version._id);
+            setApplications(applications);
         } catch (err) {
             console.error('Failed to upload new version:', err);
         } finally {
@@ -159,7 +179,15 @@ const ResumeViewPage = () => {
 
                         {/* Applications */}
                         <div className="bg-[#8B0000] rounded-t-2xl p-4 flex justify-between items-center shadow-lg">
-                            <h2 className="text-3xl font-normal ml-4">Applications</h2>
+                            <div className="ml-4">
+                                <h2 className="text-3xl font-normal">Applications</h2>
+                                {selectedVersionId && versions.length > 0 && (() => {
+                                    const v = versions.find((v) => v._id === selectedVersionId);
+                                    return v ? (
+                                        <p className="text-xs text-red-300 mt-0.5">v{v.versionNumber} — {v.commitMessage}</p>
+                                    ) : null;
+                                })()}
+                            </div>
                             <button
                                 onClick={() => setIsModalOpen(true)}
                                 className="bg-white text-black px-6 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition-all mr-4 cursor-pointer"
@@ -213,11 +241,19 @@ const ResumeViewPage = () => {
                                     <div className="flex flex-col gap-1">
                                         {[...versions].reverse().map((v, idx) => {
                                             const isHead = headVersionId === v._id;
+                                            const isSelected = selectedVersionId === v._id;
                                             return (
                                                 <div key={v._id}>
-                                                    <div className={`flex items-center gap-4 p-3 rounded-xl ${isHead ? 'bg-[#2e1f1f] border border-[#8B0000]/40' : 'bg-[#1e1e1e]'}`}>
+                                                    <div
+                                                        onClick={() => handleSelectVersion(v)}
+                                                        className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-colors ${
+                                                            isSelected
+                                                                ? 'bg-[#2e1f1f] border border-[#8B0000]/40'
+                                                                : 'bg-[#1e1e1e] hover:bg-[#272727]'
+                                                        }`}
+                                                    >
                                                         {/* Version badge */}
-                                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-mono font-bold shrink-0 ${isHead ? 'bg-[#8B0000] text-white' : 'bg-[#333] text-gray-400'}`}>
+                                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-mono font-bold shrink-0 ${isSelected ? 'bg-[#8B0000] text-white' : 'bg-[#333] text-gray-400'}`}>
                                                             v{v.versionNumber}
                                                         </div>
 
@@ -234,9 +270,14 @@ const ResumeViewPage = () => {
                                                             </div>
                                                         </div>
 
-                                                        {isHead && (
-                                                            <span className="text-xs text-[#8B0000] font-semibold shrink-0">HEAD</span>
-                                                        )}
+                                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                                            {isHead && (
+                                                                <span className="text-xs text-[#8B0000] font-semibold">HEAD</span>
+                                                            )}
+                                                            {isSelected && (
+                                                                <span className="text-xs text-gray-400">viewing</span>
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     {/* Connector line between versions */}
