@@ -1,3 +1,4 @@
+import React from 'react'
 import LoginPage from './pages/loginPage'
 import SignUpPage from './pages/signupPage'
 import HomePage from './pages/homePage'
@@ -10,7 +11,7 @@ import ResetPasswordPage from './pages/resetPasswordPage'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { getToken } from './api/client'
 
-function PrivateRoute({ element }: { element: JSX.Element }) {
+function PrivateRoute({ element }: { element: React.ReactElement }) {
   return getToken() ? element : <Navigate to="/" replace />
 }
 
