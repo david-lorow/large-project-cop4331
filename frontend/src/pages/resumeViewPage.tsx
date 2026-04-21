@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getResume, getVersionDownloadUrl, listApplications, createApplication, deleteApplication, uploadResumeVersion } from '../api/client';
+import { getResume, getVersionDownloadUrl, listApplications, createApplication, updateApplication, deleteApplication, uploadResumeVersion } from '../api/client';
 import type { Resume, ResumeVersion, Application } from '../api/client';
 import ApplicationPill from '../components/applicationPill';
 import Navbar from '../components/navBar';
@@ -40,6 +40,10 @@ const ResumeViewPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [form, setForm] = useState(EMPTY_FORM);
     const [submitting, setSubmitting] = useState(false);
+
+    const [editingApp, setEditingApp] = useState<Application | null>(null);
+    const [editForm, setEditForm] = useState(EMPTY_FORM);
+    const [editSubmitting, setEditSubmitting] = useState(false);
 
     const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
     const [versionFile, setVersionFile] = useState<File | null>(null);
@@ -104,6 +108,39 @@ const ResumeViewPage = () => {
             setApplications((prev) => prev.filter((a) => a._id !== appId));
         } catch (err) {
             console.error('Failed to delete application:', err);
+        }
+    };
+
+    const handleOpenEdit = (app: Application) => {
+        setEditingApp(app);
+        setEditForm({
+            companyName: app.companyName,
+            jobTitle: app.jobTitle,
+            status: app.status,
+            dateApplied: app.dateApplied ? app.dateApplied.slice(0, 10) : '',
+            jobLink: app.jobLink ?? '',
+            location: app.location ?? '',
+        });
+    };
+
+    const handleUpdateApplication = async () => {
+        if (!editingApp || !editForm.companyName.trim() || !editForm.jobTitle.trim()) return;
+        setEditSubmitting(true);
+        try {
+            const { application } = await updateApplication(editingApp._id, {
+                companyName: editForm.companyName,
+                jobTitle: editForm.jobTitle,
+                status: editForm.status,
+                dateApplied: editForm.dateApplied || undefined,
+                jobLink: editForm.jobLink || undefined,
+                location: editForm.location || undefined,
+            });
+            setApplications((prev) => prev.map((a) => (a._id === application._id ? application : a)));
+            setEditingApp(null);
+        } catch (err) {
+            console.error('Failed to update application:', err);
+        } finally {
+            setEditSubmitting(false);
         }
     };
 
@@ -211,12 +248,20 @@ const ResumeViewPage = () => {
                                     applications.map((app) => (
                                         <div key={app._id} className="group relative">
                                             <ApplicationPill app={app} />
-                                            <button
-                                                onClick={() => handleDeleteApplication(app._id)}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-400 text-xs px-2 cursor-pointer"
-                                            >
-                                                ✕
-                                            </button>
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => handleOpenEdit(app)}
+                                                    className="text-gray-400 hover:text-blue-400 text-xs px-2 cursor-pointer"
+                                                >
+                                                    ✎
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteApplication(app._id)}
+                                                    className="text-gray-400 hover:text-red-400 text-xs px-2 cursor-pointer"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
                                         </div>
                                     ))
                                 )}
@@ -332,6 +377,76 @@ const ResumeViewPage = () => {
                                 className="flex-1 bg-[#3a2020] py-2 rounded-lg hover:bg-[#4a2828] cursor-pointer disabled:opacity-50"
                             >
                                 {uploadingVersion ? 'Uploading…' : 'Upload'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Application Modal */}
+            {editingApp && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                    <div className="bg-[#232323] p-8 rounded-2xl w-[420px] border border-[#8B0000]">
+                        <h3 className="text-xl mb-6 font-normal">Edit Application</h3>
+
+                        <div className="flex flex-col gap-3">
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="Company *"
+                                value={editForm.companyName}
+                                onChange={(e) => setEditForm((f) => ({ ...f, companyName: e.target.value }))}
+                            />
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="Job Title *"
+                                value={editForm.jobTitle}
+                                onChange={(e) => setEditForm((f) => ({ ...f, jobTitle: e.target.value }))}
+                            />
+                            <select
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                value={editForm.status}
+                                onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as Application['status'] }))}
+                            >
+                                <option value="saved">Saved</option>
+                                <option value="applied">Applied</option>
+                                <option value="interview">Interview</option>
+                                <option value="offer">Offer</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="ghosted">Ghosted</option>
+                            </select>
+                            <input
+                                type="date"
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                value={editForm.dateApplied}
+                                onChange={(e) => setEditForm((f) => ({ ...f, dateApplied: e.target.value }))}
+                            />
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="Job Link (optional)"
+                                value={editForm.jobLink}
+                                onChange={(e) => setEditForm((f) => ({ ...f, jobLink: e.target.value }))}
+                            />
+                            <input
+                                className="w-full p-2 bg-white text-black rounded outline-none"
+                                placeholder="Location (optional)"
+                                value={editForm.location}
+                                onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
+                            />
+                        </div>
+
+                        <div className="flex gap-4 mt-6">
+                            <button
+                                onClick={() => setEditingApp(null)}
+                                className="flex-1 bg-gray-700 py-2 rounded-lg hover:bg-gray-600 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleUpdateApplication}
+                                disabled={editSubmitting || !editForm.companyName.trim() || !editForm.jobTitle.trim()}
+                                className="flex-1 bg-[#8B0000] py-2 rounded-lg hover:bg-red-800 cursor-pointer disabled:opacity-50"
+                            >
+                                {editSubmitting ? 'Saving…' : 'Save'}
                             </button>
                         </div>
                     </div>
