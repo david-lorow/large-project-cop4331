@@ -9,9 +9,9 @@ const STATUS_COLORS: Record<string, string> = {
     rejected: 'text-red-500',
     interview: 'text-blue-400',
     offer: 'text-green-500',
-    ghosted: 'text-muave-400',
-    applied: 'text-slate-500',
-    saved: 'text-gray-400',
+    ghosted: 'text-muave-500',
+    applied: 'text-gray-400',
+    saved: 'text-slate-500',
 };
 
 const ApplicationPill = ({ app, onEdit }: AppProps) => {
