@@ -7,10 +7,10 @@ interface AppProps {
 
 const STATUS_COLORS: Record<string, string> = {
     rejected: 'text-red-500',
-    interview: 'text-green-500',
-    offer: 'text-emerald-400',
-    ghosted: 'text-slate-500',
-    applied: 'text-blue-400',
+    interview: 'text-blue-400',
+    offer: 'text-green-500',
+    ghosted: 'text-muave-400',
+    applied: 'text-slate-500',
     saved: 'text-gray-400',
 };
 
