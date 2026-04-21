@@ -104,15 +104,6 @@ print(response.body);
         .map((json) => Resume.fromJson(json))
         .toList();
   }
-
-
-
-
-
-
-
-
-
   
 }
 
