@@ -496,6 +496,36 @@ router.post('/:id/versions', protect, async (req, res) => {
   }
 });
 
+// PATCH /api/resumes/:id/versions/:versionId/activate
+// Sets a specific version as the head version of a resume
+router.patch('/:id/versions/:versionId/activate', protect, async (req, res) => {
+  try {
+    const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!resume) return res.status(404).json({ message: 'Resume not found.' });
+
+    const version = await ResumeVersion.findOne({ 
+      _id: req.params.versionId, 
+      resumeId: resume._id 
+    });
+    if (!version) return res.status(404).json({ message: 'Version not found.' });
+
+    resume.headVersionId = version._id;
+    await resume.save();
+
+    const thumbnailUrl = await presignThumbnail(version.thumbnailS3Key);
+
+    return res.json({ 
+      message: 'Head version updated.',
+      thumbnailUrl,
+      title: version.commitMessage,
+    });
+  } catch (err) {
+    console.error('Activate version error:', err);
+    return res.status(500).json({ message: 'Failed to activate version.' });
+  }
+});
+
+
 // DELETE /api/resumes/:id
 router.delete('/:id', protect, async (req, res) => {
   try {
