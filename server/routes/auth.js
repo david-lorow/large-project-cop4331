@@ -92,6 +92,8 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    await User.updateOne({ _id: user._id }, { lastActiveAt: new Date() });
+
     const token = signToken(user);
 
     return res.json({
