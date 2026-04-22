@@ -1,25 +1,27 @@
-// Data model representing a Resume object returned from the API.
 class Resume {
-  final String id;           // MongoDB document ID (_id)
-  final String resumeId;     // Application-level resume identifier
-  final String name;         // Resume title
-  final String thumbnailUrl; // Full URL to the resume's thumbnail image
+  final String id;
+  final String resumeId;
+  final String name;
+  final String thumbnailUrl;
+  final String versionNumber;
 
   Resume({
     required this.id,
     required this.resumeId,
     required this.name,
     required this.thumbnailUrl,
+    required this.versionNumber,
   });
 
-  // Constructs a Resume from a JSON map returned by the API.
-  // thumbnailUrl is built by combining the base server URL with the S3 key.
   factory Resume.fromJson(Map<String, dynamic> json) {
+    final headVersion = json['headVersionId'] as Map<String, dynamic>?;
+
     return Resume(
-      id:           json['_id'],
-      resumeId:     json['resumeId'],
-      name:         json['title'],
-      thumbnailUrl: "http://45.55.57.119:6767/${json['headVersion']['thumbnailS3Key']}",
+      id:            json['_id']?.toString()                    ?? '',
+      resumeId:      json['resumeId']?.toString()               ?? '',
+      name:          json['title']?.toString()                  ?? '',
+      versionNumber: headVersion?['versionNumber']?.toString()  ?? '',
+      thumbnailUrl:  json['thumbnailUrl']?.toString()           ?? '',
     );
   }
 }

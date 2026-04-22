@@ -38,8 +38,11 @@ class MyApp extends StatelessWidget {
         '/login':            (context) => const LoginPage(),
         '/register':         (context) => const RegisterPage(),
         '/resume':           (context) => const ResumePage(),
-        '/application':      (context) => const ApplicationPage(),
       },
     );
   }
 }
+
+
+
+
