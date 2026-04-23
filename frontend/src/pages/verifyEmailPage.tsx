@@ -32,7 +32,7 @@ function VerifyEmailPage() {
       {status === 'success' && (
         <div>
           <p>Email verified! You can now sign in.</p>
-          <a href="/">Sign In</a>
+          <a href="/" className="text-blue-600 underline hover:text-blue-800">Sign In</a>
         </div>
       )}
 
