@@ -69,185 +69,278 @@ Future<void> loadApplications() async {
     }
   }
 
-  void _showAddDialog() {
-    final companyController = TextEditingController();
-    final positionController = TextEditingController();
-    String selectedStatus = _statusOptions[0];
+ void _showAddDialog() {
+  final companyController = TextEditingController();
+  final positionController = TextEditingController();
+  String selectedStatus = _statusOptions[0];
+  DateTime? selectedDate; // ✅ add this
 
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Add Application',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: companyController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Company'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: positionController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Position'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedStatus,
-                dropdownColor: const Color(0xFF1E1E1E),
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Status'),
-                items: _statusOptions
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedStatus = val);
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+  showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Application',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: companyController,
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Company'),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B0000),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
+            const SizedBox(height: 12),
+            TextField(
+              controller: positionController,
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Position'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: selectedStatus,
+              dropdownColor: const Color(0xFF1E1E1E),
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Status'),
+              items: _statusOptions
+                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) setDialogState(() => selectedStatus = val);
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // ✅ Date picker row
+            GestureDetector(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                  builder: (context, child) => Theme(
+                    data: ThemeData.dark().copyWith(
+                      colorScheme: const ColorScheme.dark(
+                        primary: Color(0xFF8B0000),
+                        surface: Color(0xFF1E1E1E),
+                      ),
+                    ),
+                    child: child!,
+                  ),
+                );
+                if (picked != null) {
+                  setDialogState(() => selectedDate = picked);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
                   borderRadius: BorderRadius.circular(8),
                 ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.grey, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      selectedDate != null
+                          ? '${selectedDate!.month}/${selectedDate!.day}/${selectedDate!.year}'
+                          : 'Date Applied (optional)',
+                      style: TextStyle(
+                        color: selectedDate != null ? Colors.white : Colors.grey,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              onPressed: () async {
-                final company = companyController.text.trim();
-                final position = positionController.text.trim();
-                if (company.isEmpty || position.isEmpty) return;
-                Navigator.pop(context);
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B0000),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final company = companyController.text.trim();
+              final position = positionController.text.trim();
+              if (company.isEmpty || position.isEmpty) return;
+              Navigator.pop(context);
 
-                try {
-  await ApplicationService.createApplication(
-    resumeId: widget.resumeId,
-    resumeVersionId: widget.resumeVersionId, // ✅ tie to specific version
-    companyName: company,
-    jobTitle: position,
-    status: selectedStatus.toLowerCase(),
+              try {
+                await ApplicationService.createApplication(
+                  resumeId: widget.resumeId,
+                  resumeVersionId: widget.resumeVersionId,
+                  companyName: company,
+                  jobTitle: position,
+                  status: selectedStatus.toLowerCase(),
+                  dateApplied: selectedDate?.toIso8601String(), // ✅ pass date
+                );
+              } catch (e) {
+                print("❌ Create application error: $e");
+              }
+
+              await loadApplications();
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    ),
   );
-} catch (e) {
-  print("❌ Create application error: $e");
 }
 
-                // Always reload from backend regardless of response
-                await loadApplications();
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        ),
-      ),
-    );
+void _showEditDialog(Application app) {
+  final companyController = TextEditingController(text: app.companyName);
+  final positionController = TextEditingController(text: app.jobTitle);
+  String selectedStatus = _statusOptions.firstWhere(
+    (s) => s.toLowerCase() == app.status.toLowerCase(),
+    orElse: () => _statusOptions[0],
+  );
+
+  // Parse existing date if present
+  DateTime? selectedDate;
+  if (app.dateApplied != null) {
+    try {
+      selectedDate = DateTime.parse(app.dateApplied!).toLocal();
+    } catch (_) {}
   }
 
-  void _showEditDialog(Application app) {
-    final companyController = TextEditingController(text: app.companyName);
-    final positionController = TextEditingController(text: app.jobTitle);
-
-    // Match the stored status to a display option, defaulting to 'Applied'
-    String selectedStatus = _statusOptions.firstWhere(
-      (s) => s.toLowerCase() == app.status.toLowerCase(),
-      orElse: () => _statusOptions[0],
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Edit Application',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: companyController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Company'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: positionController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Position'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedStatus,
-                dropdownColor: const Color(0xFF1E1E1E),
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Status'),
-                items: _statusOptions
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedStatus = val);
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+  showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Edit Application',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: companyController,
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Company'),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8B0000),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
+            const SizedBox(height: 12),
+            TextField(
+              controller: positionController,
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Position'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: selectedStatus,
+              dropdownColor: const Color(0xFF1E1E1E),
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Status'),
+              items: _statusOptions
+                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) setDialogState(() => selectedStatus = val);
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Date picker
+            GestureDetector(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: selectedDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                  builder: (context, child) => Theme(
+                    data: ThemeData.dark().copyWith(
+                      colorScheme: const ColorScheme.dark(
+                        primary: Color(0xFF8B0000),
+                        surface: Color(0xFF1E1E1E),
+                      ),
+                    ),
+                    child: child!,
+                  ),
+                );
+                if (picked != null) {
+                  setDialogState(() => selectedDate = picked);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
                   borderRadius: BorderRadius.circular(8),
                 ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.grey, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      selectedDate != null
+                          ? '${selectedDate!.month}/${selectedDate!.day}/${selectedDate!.year}'
+                          : 'Date Applied (optional)',
+                      style: TextStyle(
+                        color: selectedDate != null ? Colors.white : Colors.grey,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              onPressed: () async {
-                final company = companyController.text.trim();
-                final position = positionController.text.trim();
-                if (company.isEmpty || position.isEmpty) return;
-                Navigator.pop(context);
-
-                try {
-                  await ApplicationService.updateApplication(
-                    app.id,
-                    companyName: company,
-                    jobTitle: position,
-                    status: selectedStatus.toLowerCase(),
-                  );
-                } catch (e) {
-                  print("❌ Update application error: $e");
-                }
-
-                await loadApplications();
-              },
-              child: const Text('Save'),
             ),
           ],
         ),
-      ),
-    );
-  }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B0000),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              final company = companyController.text.trim();
+              final position = positionController.text.trim();
+              if (company.isEmpty || position.isEmpty) return;
+              Navigator.pop(context);
 
+              try {
+                await ApplicationService.updateApplication(
+                  app.id,
+                  companyName: company,
+                  jobTitle: position,
+                  status: selectedStatus.toLowerCase(),
+                  dateApplied: selectedDate?.toIso8601String(),
+                );
+              } catch (e) {
+                print("❌ Update application error: $e");
+              }
+
+              await loadApplications();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,

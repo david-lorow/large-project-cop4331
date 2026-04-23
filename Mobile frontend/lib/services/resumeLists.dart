@@ -115,6 +115,8 @@ Future<void> showResumeActions(
   VoidCallback? onDeleted,
   void Function(String thumbnailUrl, String versionName, String versionId)? onVersionSelected,
 }) async {
+  final rootContext = context;
+
   showDialog(
     context: context,
     builder: (context) {
@@ -131,29 +133,65 @@ Future<void> showResumeActions(
                 label: const Text("Select Version"),
                 onPressed: () async {
                   Navigator.pop(context);
+                  await Future.delayed(const Duration(milliseconds: 150));
+                  if (!rootContext.mounted) return;
                   await showVersionListDialog(
-                    context,
+                    rootContext,
                     id,
                     onVersionSelected: onVersionSelected,
+                    rootContext: rootContext,
                   );
                 },
               ),
             ),
 
             const SizedBox(height: 10),
+SizedBox(
+  width: double.infinity,
+  child: ElevatedButton.icon(
+    icon: const Icon(Icons.upload_file),
+    label: const Text("Add Version"),
+    onPressed: () async {
+      Navigator.pop(context);
+      await Future.delayed(const Duration(milliseconds: 150));
+      if (!rootContext.mounted) return;
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.upload_file),
-                label: const Text("Add Version"),
-                onPressed: () {
-                  pickAndUploadVersion("title", id);
-                  Navigator.pop(context);
-                },
-              ),
+      final titleController = TextEditingController();
+      final confirmed = await showDialog<bool>(
+        context: rootContext,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("Version Name"),
+          content: TextField(
+            controller: titleController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: "Enter a name for this version",
+              border: OutlineInputBorder(),
             ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Upload"),
+            ),
+          ],
+        ),
+      );
 
+      if (confirmed == true && rootContext.mounted) {
+        final title = titleController.text.trim().isEmpty
+            ? "Untitled"
+            : titleController.text.trim();
+        pickAndUploadVersion(title, id); // was hardcoded "title"
+      }
+    },
+  ),
+),
             const SizedBox(height: 10),
 
             SizedBox(
@@ -165,9 +203,13 @@ Future<void> showResumeActions(
                   backgroundColor: Colors.red,
                 ),
                 onPressed: () async {
-                  await deleteRequest(id);
                   Navigator.pop(context);
-                  onDeleted?.call();
+                  try {
+                    await deleteRequest(id);
+                    onDeleted?.call();
+                  } catch (e) {
+                    print("❌ Delete resume error: $e");
+                  }
                 },
               ),
             ),
@@ -185,30 +227,53 @@ Future<void> showResumeActions(
 
 
 
-
-
 Future<void> showVersionListDialog(
   BuildContext context,
   String id, {
   void Function(String thumbnailUrl, String versionName, String versionId)? onVersionSelected,
+  BuildContext? rootContext,
 }) async {
+  final dialogContext = rootContext ?? context;
+
+  showDialog(
+    context: dialogContext,
+    barrierDismissible: false,
+    builder: (context) => const AlertDialog(
+      backgroundColor: Color(0xFF1E1E1E),
+      content: Row(
+        children: [
+          CircularProgressIndicator(color: Color(0xFF8B0000)),
+          SizedBox(width: 16),
+          Text("Loading versions...", style: TextStyle(color: Colors.white)),
+        ],
+      ),
+    ),
+  );
+
+  print("🔄 Calling getResume($id)");
   final resumeData = await getResume(id);
+  print("🔄 getResume returned: ${resumeData == null ? 'NULL' : 'OK'}");
+  print("🔄 context.mounted after getResume: ${dialogContext.mounted}");
+
+  if (!dialogContext.mounted) {
+    print("❌ Context not mounted — cannot pop loading dialog");
+    return;
+  }
+
+  Navigator.pop(dialogContext);
+  print("🔄 Loading dialog popped");
 
   if (resumeData == null) {
-    print("❌ Failed to load versions");
+    print("❌ resumeData is null — aborting");
     return;
   }
 
-  // ✅ Guard against stale context after the async gap
-  if (!context.mounted) {
-    print("❌ Context no longer mounted, cannot show dialog");
-    return;
-  }
+  if (!dialogContext.mounted) return;
 
   final versions = resumeData.versions;
   print("✅ Loaded ${versions.length} versions for resume $id");
   for (final v in versions) {
-    print("  VERSION: id=${v.id} | name=${v.name} | number=${v.versionNumber} | thumbnail=${v.thumbnailUrl}");
+    print("  VERSION: id=${v.id} | name=${v.name} | number=${v.versionNumber}");
   }
 
   String? selectedVersionId;
@@ -216,7 +281,7 @@ Future<void> showVersionListDialog(
   String? selectedThumbnailUrl;
 
   showDialog(
-    context: context,
+    context: dialogContext,
     builder: (context) {
       return StatefulBuilder(
         builder: (context, setState) {
@@ -232,44 +297,43 @@ Future<void> showVersionListDialog(
                       itemBuilder: (context, index) {
                         final version = versions[index];
                         return ListTile(
-  title: Text("Version ${version.versionNumber}"),
-  subtitle: Text(version.commitMessage), // ✅ shows commit message
-  selected: version.id == selectedVersionId,
-  onTap: () {
-    setState(() {
-      selectedVersionId = version.id;
-      selectedThumbnailUrl = version.thumbnailUrl;
-      selectedName = version.commitMessage; // ✅ pass commit message as name
-    });
-  },
-);
+                          title: Text("Version ${version.versionNumber}"),
+                          subtitle: Text(version.commitMessage),
+                          selected: version.id == selectedVersionId,
+                          onTap: () {
+                            print("👆 Tapped: id=${version.id} | commitMessage=${version.commitMessage}");
+                            setState(() {
+                              selectedVersionId = version.id;
+                              selectedThumbnailUrl = version.thumbnailUrl;
+                              selectedName = version.commitMessage;
+                            });
+                          },
+                        );
                       },
                     ),
             ),
             actions: [
               TextButton(
-                onPressed: () {
-                  print("🚫 Cancelled version selection");
-                  Navigator.pop(context);
-                },
+                onPressed: () => Navigator.pop(context),
                 child: const Text("Cancel"),
               ),
               ElevatedButton(
-  onPressed: selectedVersionId == null
-      ? null
-      : () async {
-          final result = await activateVersion(id, selectedVersionId!);
-          print("✅ Activated | thumbnail=${result['thumbnailUrl']} | name=${result['name']}");
-          if (!context.mounted) return;
-          Navigator.pop(context);
-          onVersionSelected?.call(
-            result['thumbnailUrl'] ?? '',
-            result['name'] ?? selectedName ?? '',
-            selectedVersionId ?? '',
-          );
-        },
-  child: const Text("Confirm"),
-),
+                onPressed: selectedVersionId == null
+                    ? null
+                    : () async {
+                        print("🔄 Confirm pressed — calling activateVersion");
+                        final result = await activateVersion(id, selectedVersionId!);
+                        print("🔄 activateVersion result: $result");
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        onVersionSelected?.call(
+                          result['thumbnailUrl'] ?? '',
+                          result['name'] ?? selectedName ?? '',
+                          selectedVersionId ?? '',
+                        );
+                      },
+                child: const Text("Confirm"),
+              ),
             ],
           );
         },
@@ -277,7 +341,6 @@ Future<void> showVersionListDialog(
     },
   );
 }
-
 
 
 
@@ -421,6 +484,7 @@ Future<Map<String, String?>> activateVersion(String resumeId, String versionId) 
   final token = prefs.getString('token');
 
   final url = ApiClient.changeVersion(resumeId, versionId);
+  print("🔄 ACTIVATE URL: $url");
 
   final response = await http.patch(
     url,
@@ -430,6 +494,9 @@ Future<Map<String, String?>> activateVersion(String resumeId, String versionId) 
     },
   );
 
+  print("🔄 ACTIVATE STATUS: ${response.statusCode}");
+  print("🔄 ACTIVATE BODY: ${response.body}");
+
   if (response.statusCode == 200) {
     final data = jsonDecode(response.body);
     return {
@@ -438,6 +505,5 @@ Future<Map<String, String?>> activateVersion(String resumeId, String versionId) 
     };
   }
 
-  // ✅ always return a map, never null
   return {'thumbnailUrl': null, 'name': null};
 }
