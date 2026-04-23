@@ -4,22 +4,20 @@ import 'pages/loginAndRegister.dart';
 import 'pages/login.dart';
 import 'pages/register.dart';
 import 'pages/resume.dart';
-import 'pages/application.dart';
 
-// Entry point — checks SharedPreferences to determine if the user is already
-// logged in, then launches the app at the appropriate initial route.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final prefs     = await SharedPreferences.getInstance();
+  final prefs = await SharedPreferences.getInstance();
   final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+  final token = prefs.getString('token');
 
-  runApp(MyApp(isLoggedIn: isLoggedIn));
+  // ✅ If flagged as logged in but no token exists, treat as logged out
+  final shouldGoToResume = isLoggedIn && token != null && token.isNotEmpty;
+
+  runApp(MyApp(isLoggedIn: shouldGoToResume));
 }
 
-
-// Root widget of the application.
-// Receives the login state from main() to set the correct initial route.
 class MyApp extends StatelessWidget {
   final bool isLoggedIn;
 
@@ -30,8 +28,6 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Resume Reaper',
       theme: ThemeData.dark(),
-
-      // Send logged-in users straight to the resume page, others to login/register
       initialRoute: isLoggedIn ? '/resume' : '/loginAndRegister',
       routes: {
         '/loginAndRegister': (context) => const LoginOrRegister(),
@@ -42,7 +38,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-
-
-

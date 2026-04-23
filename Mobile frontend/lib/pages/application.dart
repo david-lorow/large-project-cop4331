@@ -3,7 +3,8 @@ import 'package:team24/services/applicationsService.dart';
 
 class ApplicationPage extends StatefulWidget {
   final String resumeId;
-  const ApplicationPage({super.key, required this.resumeId});
+  final String? resumeVersionId;
+  const ApplicationPage({super.key, required this.resumeId, this.resumeVersionId});
 
   @override
   State<ApplicationPage> createState() => _ApplicationPageState();
@@ -27,21 +28,28 @@ class _ApplicationPageState extends State<ApplicationPage> {
     loadApplications();
   }
 
-  Future<void> loadApplications() async {
-    try {
-      final data = await ApplicationService.listApplications(
-        resumeId: widget.resumeId,
-      );
-      print("✅ Loaded ${data.length} applications");
-      setState(() {
-        _applications = data;
-        _loading = false;
-      });
-    } catch (e) {
-      print("❌ loadApplications error: $e");
-      setState(() => _loading = false);
+Future<void> loadApplications() async {
+  print("🔍 Loading applications for resumeId: ${widget.resumeId}");
+  print("🔍 Loading applications for versionId: ${widget.resumeVersionId}");
+  try {
+    final data = await ApplicationService.listApplications(
+      resumeId: widget.resumeId,
+      resumeVersionId: widget.resumeVersionId,
+    );
+    print("✅ Loaded ${data.length} applications");
+    for (final a in data) {
+      print("  APP: ${a.companyName} | resumeVersionId: ${a.resumeVersionId}");
     }
+    print("✅ Loaded ${data.length} applications for version ${widget.resumeVersionId}");
+    setState(() {
+      _applications = data;
+      _loading = false;
+    });
+  } catch (e) {
+    print("❌ loadApplications error: $e");
+    setState(() => _loading = false);
   }
+}
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
@@ -127,15 +135,16 @@ class _ApplicationPageState extends State<ApplicationPage> {
                 Navigator.pop(context);
 
                 try {
-                  await ApplicationService.createApplication(
-                    resumeId: widget.resumeId,
-                    companyName: company,
-                    jobTitle: position,
-                    status: selectedStatus.toLowerCase(),
-                  );
-                } catch (e) {
-                  print("❌ Create application error: $e");
-                }
+  await ApplicationService.createApplication(
+    resumeId: widget.resumeId,
+    resumeVersionId: widget.resumeVersionId, // ✅ tie to specific version
+    companyName: company,
+    jobTitle: position,
+    status: selectedStatus.toLowerCase(),
+  );
+} catch (e) {
+  print("❌ Create application error: $e");
+}
 
                 // Always reload from backend regardless of response
                 await loadApplications();
@@ -284,7 +293,7 @@ class _ApplicationPageState extends State<ApplicationPage> {
 
                 const SizedBox(width: 12),
 
-                const Expanded(
+                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -299,9 +308,12 @@ class _ApplicationPageState extends State<ApplicationPage> {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Track your job applications',
-                        style: TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
+  widget.resumeVersionId != null
+      ? 'Version applications'
+      : 'All applications',
+  style: const TextStyle(color: Colors.white70, fontSize: 13),
+),
+
                     ],
                   ),
                 ),

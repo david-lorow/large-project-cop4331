@@ -4,6 +4,7 @@ class Resume {
   final String name;
   final String thumbnailUrl;
   final String versionNumber;
+  final String versionId;
 
   Resume({
     required this.id,
@@ -11,6 +12,7 @@ class Resume {
     required this.name,
     required this.thumbnailUrl,
     required this.versionNumber,
+    required this.versionId,
   });
 
   factory Resume.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,7 @@ class Resume {
       name:          json['title']?.toString()                  ?? '',
       versionNumber: headVersion?['versionNumber']?.toString()  ?? '',
       thumbnailUrl:  json['thumbnailUrl']?.toString()           ?? '',
+      versionId:     headVersion?['_id']?.toString()           ?? '',
     );
   }
 }

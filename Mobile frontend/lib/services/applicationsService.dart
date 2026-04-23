@@ -98,6 +98,7 @@ class ApplicationService {
       resumeId: resumeId,
       resumeVersionId: resumeVersionId,
     );
+     print("📡 LIST URL: $url"); // ✅ verify query params are present
 
     final response = await http.get(url, headers: _authHeaders(token));
 

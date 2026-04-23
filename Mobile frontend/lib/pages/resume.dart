@@ -18,6 +18,7 @@ class _ResumePageState extends State<ResumePage> {
   List<Resume> resumes = [];
   Map<int, String> _overrideThumbnailUrls = {};
   Map<int, String> _overrideResumeNames = {};
+  Map<int, String> _overrideVersionIds = {};
   String _currentResumeName = '';
 
   @override
@@ -27,19 +28,36 @@ class _ResumePageState extends State<ResumePage> {
   }
 
   Future<void> loadResumes() async {
-    try {
-      final data = await ResumeService.listResumes();
-      setState(() {
-        resumes = data;
-        _overrideThumbnailUrls = {};
-        _overrideResumeNames = {};
-        _currentResumeName = data.isNotEmpty ? data[0].name : '';
-      });
-    } catch (e, stack) {
-      print("❌ loadResumes error: $e");
-      print("❌ Stack: $stack");
+  try {
+    final data = await ResumeService.listResumes();
+    setState(() {
+  resumes = data;
+  _overrideThumbnailUrls = {};
+  _overrideResumeNames = {};
+  _overrideVersionIds = {}; // ✅
+  _currentResumeName = data.isNotEmpty ? data[0].name : '';
+});
+  } catch (e, stack) {
+    print("❌ loadResumes error: $e");
+    print("❌ Stack: $stack");
+
+    // ✅ If session expired, clear token and redirect to login
+    if (e.toString().contains('401') ||
+        e.toString().contains('expired') ||
+        e.toString().contains('Invalid')) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', false);
+      await prefs.remove('token');
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/loginAndRegister',
+          (route) => false,
+        );
+      }
     }
   }
+}
 
   void _showUploadDialog(BuildContext context) {
     final TextEditingController titleController = TextEditingController();
@@ -141,7 +159,9 @@ class _ResumePageState extends State<ResumePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      body: Column(
+      body: PopScope(
+        canPop: false,
+        child: Column(
         children: [
 
           // ── Header banner ──────────────────────────────────────────
@@ -371,16 +391,23 @@ class _ResumePageState extends State<ResumePage> {
                             ),
                             icon: const Icon(Icons.work_outline, size: 18),
                             label: const Text('Applications'),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-
-                                builder: (_) => ApplicationPage(
-                                  resumeId: resumes[currentPage < resumes.length ? currentPage : 0].id,
-                                )
-                              )
-
-                            )
+                            onPressed: resumes.isEmpty
+    ? null
+    : () {
+        final index = currentPage < resumes.length ? currentPage : 0;
+        final resume = resumes[index];
+        // ✅ Use override version if set, otherwise fall back to resume's head version
+        final versionId = _overrideVersionIds[index] ?? resume.versionId;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ApplicationPage(
+              resumeId: resume.id,
+              resumeVersionId: versionId,
+            ),
+          ),
+        );
+      },
                           ),
                         ),
 
@@ -411,11 +438,12 @@ class _ResumePageState extends State<ResumePage> {
                                       onDeleted: () async {
                                         await loadResumes();
                                       },
-                                      onVersionSelected: (thumbnailUrl, versionName) {
+                                      onVersionSelected: (thumbnailUrl, versionName, versionId) {
                                         print("CALLBACK FIRED: $thumbnailUrl / $versionName");
                                         setState(() {
                                           _overrideThumbnailUrls[currentPage] = thumbnailUrl;
                                           _overrideResumeNames[currentPage] = versionName;
+                                           _overrideVersionIds[currentPage] = versionId; // ✅ store it
                                           _currentResumeName = versionName;
                                         });
                                       },
@@ -434,6 +462,7 @@ class _ResumePageState extends State<ResumePage> {
           ),
         ],
       ),
+      )
     );
   }
 }

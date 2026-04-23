@@ -13,6 +13,8 @@ import 'package:http_parser/http_parser.dart';
 import 'package:team24/models/ResumeResponse.dart';
 
 
+
+
 Future<String?> getToken() async {
   final prefs = await SharedPreferences.getInstance();
   return prefs.getString('token');
@@ -111,7 +113,7 @@ Future<void> showResumeActions(
   File? file,
   String id, {
   VoidCallback? onDeleted,
-  void Function(String thumbnailUrl, String versionName)? onVersionSelected,
+  void Function(String thumbnailUrl, String versionName, String versionId)? onVersionSelected,
 }) async {
   showDialog(
     context: context,
@@ -188,7 +190,7 @@ Future<void> showResumeActions(
 Future<void> showVersionListDialog(
   BuildContext context,
   String id, {
-  void Function(String thumbnailUrl, String versionName)? onVersionSelected,
+  void Function(String thumbnailUrl, String versionName, String versionId)? onVersionSelected,
 }) async {
   final resumeData = await getResume(id);
 
@@ -263,6 +265,7 @@ Future<void> showVersionListDialog(
           onVersionSelected?.call(
             result['thumbnailUrl'] ?? '',
             result['name'] ?? selectedName ?? '',
+            selectedVersionId ?? '',
           );
         },
   child: const Text("Confirm"),
